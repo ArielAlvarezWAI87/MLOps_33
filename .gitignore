@@ -1,0 +1,186 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+conda_env/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+.jupyter/
+profile_default/
+
+# VS Code
+.vscode/
+.history/
+*.code-workspace
+
+# Machine Learning / Data Science
+# Models
+*.h5
+*.pkl
+*.pickle
+*.joblib
+*.pt
+*.pth
+*.onnx
+*.pb
+*.tflite
+saved_model/
+checkpoints/
+model_checkpoints/
+models/
+mlruns/
+mlflow/
+
+# Data files (uncomment if you don't want to track data)
+# data/
+# *.csv
+# *.tsv
+# *.dat
+# *.parquet
+# *.feather
+# *.hdf5
+# *.h5
+
+# Large datasets
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Logs and tracking
+logs/
+*.log
+wandb/
+tensorboard/
+tb_logs/
+lightning_logs/
+
+# Experiment tracking
+.neptune/
+.comet/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# SQL Server
+*.mdf
+*.ldf
+*.bak
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Secrets and credentials
+secrets/
+credentials/
+*.pem
+*.key
+*.crt
+*.p12
+config/secrets.json
+config/credentials.json
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# IDEs
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+.vscode/
+.spyproject/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Documentation
+docs/_build/
+site/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.cache
+
+# Package manager
+poetry.lock
+Pipfile.lock
+
+# Docker
+*.tar
+docker-compose.override.yml
+
+# MLOps specific
+artifacts/
+outputs/
+experiments/
+runs/
+
+# Airflow
+airflow.db
+airflow.cfg
+logs/
+dags/__pycache__/
+
+# DVC (Data Version Control)
+.dvc/
+
+# Notebooks output
+*.html
+*.pdf
+
+# Config files with sensitive data
+config/local_settings.py
+config/production.py
+settings.json
+local_config.json
