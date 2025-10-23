@@ -61,15 +61,22 @@ models/
 mlruns/
 mlflow/
 
-# Data files (uncomment if you don't want to track data)
-# data/
-# *.csv
-# *.tsv
-# *.dat
-# *.parquet
-# *.feather
-# *.hdf5
-# *.h5
+# Data files
+#data/
+*.csv
+*.tsv
+*.dat
+*.parquet
+*.feather
+*.hdf5
+#*.h5
+
+# Allow DVC tracked files
+#!*.csv.dvc
+#!*.tsv.dvc
+#!*.parquet.dvc
+#!*.feather.dvc
+#!*.dat.dvc
 
 # Large datasets
 *.zip
