@@ -57,11 +57,11 @@ profile_default/
 saved_model/
 checkpoints/
 model_checkpoints/
-!src/models/**/*.py
-!src/models/*.py
-models/
+/models/
 mlruns/
 mlflow/
+#!src/models/**/*.py
+#!src/models/*.py
 
 # Data files
 #data/
