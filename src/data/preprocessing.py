@@ -14,6 +14,9 @@ Output:
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import sys
+import os
+from pathlib import Path
 
 
 class DataPreprocessor:
@@ -190,10 +193,21 @@ class DataPreprocessor:
 # Example usage
 # --------------------------------------------------------------------------
 if __name__ == "__main__":
-    root= "C:/Users/AABDC5/repo/PythonML/dev/mlops-homework/"
+    #root= "C:/Users/AABDC5/repo/PythonML/dev/mlops-homework/"
+    #root = sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+    ROOT_DIR = Path(__file__).resolve().parents[2] 
+    RAW_DIR = ROOT_DIR / "data" / "raw"
+    PROCESSED_DIR = ROOT_DIR / "data" / "processed"
+
     preprocessor = DataPreprocessor(
-        raw_dir=root+"data/raw",
-        processed_dir=root+"data/processed"
+        raw_dir = RAW_DIR,
+        processed_dir = PROCESSED_DIR
     )
+
     df_clean = preprocessor.run("steel_energy_original.csv")
+    #print(ROOT_DIR,RAW_DIR,PROCESSED_DIR)
+    #print(sys.path)
+
+
+
 

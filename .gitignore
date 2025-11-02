@@ -57,6 +57,8 @@ profile_default/
 saved_model/
 checkpoints/
 model_checkpoints/
+!src/models/**/*.py
+!src/models/*.py
 models/
 mlruns/
 mlflow/

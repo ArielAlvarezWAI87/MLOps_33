@@ -250,9 +250,12 @@ class FeatureEngineer:
 # Example usage
 # --------------------------------------------------------------------------
 if __name__ == "__main__":
-    root="C:/Users/AABDC5/repo/PythonML/dev/mlops-homework/"
+    #root="C:/Users/AABDC5/repo/PythonML/dev/mlops-homework/"
+    ROOT_DIR = Path(__file__).resolve().parents[2] 
+    PROCESSED_DIR = ROOT_DIR / "data" / "processed"
+
     fe = FeatureEngineer(
-        raw_processed_dir=root+"data/processed",
-        save_dir=root+"data/processed"
+        raw_processed_dir = PROCESSED_DIR,
+        save_dir = PROCESSED_DIR
     )
     fe.run("steel_energy_processed.csv")
