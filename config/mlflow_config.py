@@ -20,9 +20,10 @@ class MLflowConfig:
         
         mlflow.set_experiment(self.experiment_name)
         
-        print(f"✅ MLflow configured:")
+        print(f" MLflow configured:")
         print(f"   Tracking URI: {self.tracking_uri}")
         print(f"   Experiment: {self.experiment_name}")
+        print(f"   MLflow runs will be stored in: {Path(self.tracking_uri.replace('file:', ''))}")
         
     @staticmethod
     def log_model_info(model, model_name, signature=None):
