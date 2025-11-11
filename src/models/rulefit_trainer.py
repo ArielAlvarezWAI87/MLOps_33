@@ -128,7 +128,7 @@ class RuleFitTrainer:
 # Example usage
 # --------------------------------------------------------------------------
 if __name__ == "__main__":
-    #root="C:/Users/BSG/Documents/Academic/2025/MLOps/MLOps_33-main/MLOps_33-main/"
+ 
     ROOT_DIR = Path(__file__).resolve().parents[2] 
     PROCESSED_DIR = ROOT_DIR / "data" / "processed"
     MODEL_DIR = ROOT_DIR / "models"
