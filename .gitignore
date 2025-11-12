@@ -65,6 +65,8 @@ mlflow/
 
 # Data files
 #data/
+/data/raw
+/data/processed
 *.csv
 *.tsv
 *.dat
