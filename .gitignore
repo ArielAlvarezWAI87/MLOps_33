@@ -182,7 +182,10 @@ logs/
 dags/__pycache__/
 
 # DVC (Data Version Control)
-.dvc/
+# Ignore DVC cache and local config, but track .dvc/config
+.dvc/cache
+.dvc/tmp
+.dvc/config.local
 
 # Notebooks output
 *.html
