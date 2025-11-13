@@ -66,7 +66,7 @@ echo ""
 
 # Step 5: Install dependencies
 echo "📦 Installing dependencies from requirements.txt..."
-pip install --upgrade pip
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 echo "✓ Dependencies installed"
 echo ""
