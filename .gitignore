@@ -57,14 +57,20 @@ profile_default/
 saved_model/
 checkpoints/
 model_checkpoints/
-/models/
+# /models/  <- Commented out to allow DVC tracking
 mlruns/
 mlflow/
 #!src/models/**/*.py
 #!src/models/*.py
 
+# Allow DVC files in models directory
+!models/*.dvc
+!models/.gitignore
+
 # Data files
 #data/
+/data/raw
+/data/processed
 *.csv
 *.tsv
 *.dat
@@ -182,7 +188,10 @@ logs/
 dags/__pycache__/
 
 # DVC (Data Version Control)
-.dvc/
+# Ignore DVC cache and local config, but track .dvc/config
+.dvc/cache
+.dvc/tmp
+.dvc/config.local
 
 # Notebooks output
 *.html

@@ -6,3 +6,9 @@ mlflow
 joblib
 imodels
 semver
+
+# Data versioning
+dvc[s3]
+
+# Environment variables
+python-dotenv
