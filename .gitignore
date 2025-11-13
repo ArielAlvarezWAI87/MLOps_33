@@ -57,11 +57,15 @@ profile_default/
 saved_model/
 checkpoints/
 model_checkpoints/
-/models/
+# /models/  <- Commented out to allow DVC tracking
 mlruns/
 mlflow/
 #!src/models/**/*.py
 #!src/models/*.py
+
+# Allow DVC files in models directory
+!models/*.dvc
+!models/.gitignore
 
 # Data files
 #data/

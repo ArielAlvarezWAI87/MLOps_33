@@ -1,0 +1,5 @@
+outs:
+- md5: be8430b5d3fb3fd4539798b4c8b81cd5
+  size: 20232
+  hash: md5
+  path: rulefit.pkl
