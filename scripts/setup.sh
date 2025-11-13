@@ -53,7 +53,14 @@ echo ""
 
 # Step 4: Activate virtual environment
 echo "🔌 Activating virtual environment..."
-source .venv/bin/activate
+if [ -f .venv/bin/activate ]; then
+    source .venv/bin/activate
+elif [ -f .venv/Scripts/activate ]; then
+    source .venv/Scripts/activate
+else
+    echo "❌ Error: Could not find activation script"
+    exit 1
+fi
 echo "✓ Virtual environment activated"
 echo ""
 
