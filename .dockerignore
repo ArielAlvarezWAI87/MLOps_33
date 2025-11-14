@@ -64,6 +64,9 @@ temp_*/
 # CI/CD
 .github/
 
+# Keep scripts (needed for Docker)
+!scripts/
+
 # Data (will be pulled via DVC)
 # Uncomment if you want to exclude data from image
 # data/raw/*
