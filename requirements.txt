@@ -13,6 +13,11 @@ dvc[s3]
 # Environment variables
 python-dotenv
 
+# API serving
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+httpx>=0.24.0
+
 # Testing dependencies
 pytest>=7.4.0
 pytest-cov>=4.1.0

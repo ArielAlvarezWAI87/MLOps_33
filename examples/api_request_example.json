@@ -1,0 +1,28 @@
+{
+  "data": [
+    {
+      "date": "2018-01-15 14:30:00",
+      "Lagging_Current_Reactive_Power_kVarh": 45.2,
+      "Leading_Current_Reactive_Power_kVarh": 12.5,
+      "CO2(tCO2)": 0.008,
+      "Lagging_Current_Power_Factor": 0.85,
+      "Leading_Current_Power_Factor": 0.78,
+      "NSM": 5000,
+      "WeekStatus": "Weekday",
+      "Day_of_week": "Monday",
+      "Load_Type": "Medium_Load"
+    },
+    {
+      "date": "2018-01-15 15:30:00",
+      "Lagging_Current_Reactive_Power_kVarh": 50.0,
+      "Leading_Current_Reactive_Power_kVarh": 15.0,
+      "CO2(tCO2)": 0.010,
+      "Lagging_Current_Power_Factor": 0.90,
+      "Leading_Current_Power_Factor": 0.82,
+      "NSM": 6000,
+      "WeekStatus": "Weekday",
+      "Day_of_week": "Tuesday",
+      "Load_Type": "Maximum_Load"
+    }
+  ]
+}

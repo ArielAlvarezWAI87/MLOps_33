@@ -62,6 +62,232 @@ git commit -m "Update model"
 git push
 ```
 
+## Model Serving API
+
+### Starting the API Server
+
+**Quick start:**
+```bash
+./scripts/start_api.sh
+```
+
+**Manual start:**
+```bash
+# Activate environment
+source .venv/bin/activate
+
+# Start API server
+uvicorn src.deployment.api:app --host 0.0.0.0 --port 8000 --reload
+```
+
+The API will be available at `http://localhost:8000`
+
+**Interactive Documentation:**
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+### Model Information
+
+**Current Model:**
+- **Name**: `rulefit_steel_energy`
+- **Version**: `1.0.0`
+- **Type**: RuleFitRegressor
+- **Model Path**: `models/rulefit.pkl`
+- **Preprocessor Path**: `data/processed/preprocessor.pkl`
+
+**Model Registry (MLflow):**
+```
+models:/rulefit_steel_energy/1.0.0
+```
+
+### API Endpoints
+
+#### 1. **GET /** - API Information
+Get basic information about the API.
+
+```bash
+curl http://localhost:8000/
+```
+
+#### 2. **GET /health** - Health Check
+Check if the API and model are ready.
+
+```bash
+curl http://localhost:8000/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "model_loaded": true,
+  "preprocessor_loaded": true,
+  "timestamp": "2025-01-15T10:30:00"
+}
+```
+
+#### 3. **GET /model/info** - Model Metadata
+Get information about the loaded model.
+
+```bash
+curl http://localhost:8000/model/info
+```
+
+**Response:**
+```json
+{
+  "model_name": "rulefit_steel_energy",
+  "model_version": "1.0.0",
+  "model_path": "models/rulefit.pkl",
+  "preprocessor_path": "data/processed/preprocessor.pkl",
+  "model_type": "RuleFitRegressor"
+}
+```
+
+#### 4. **POST /predict** - Make Predictions
+Predict energy consumption for steel manufacturing.
+
+**Request Schema:**
+```json
+{
+  "data": [
+    {
+      "date": "2018-01-15 14:30:00",
+      "Lagging_Current_Reactive_Power_kVarh": 45.2,
+      "Leading_Current_Reactive_Power_kVarh": 12.5,
+      "CO2(tCO2)": 0.008,
+      "Lagging_Current_Power_Factor": 0.85,
+      "Leading_Current_Power_Factor": 0.78,
+      "NSM": 5000,
+      "WeekStatus": "Weekday",
+      "Day_of_week": "Monday",
+      "Load_Type": "Medium_Load"
+    }
+  ]
+}
+```
+
+**Field Validations:**
+- `Lagging_Current_Reactive_Power_kVarh`: 0 ≤ value ≤ 100
+- `Leading_Current_Reactive_Power_kVarh`: 0 ≤ value ≤ 30
+- `CO2(tCO2)`: 0 ≤ value ≤ 0.02
+- `Lagging_Current_Power_Factor`: 0 ≤ value ≤ 1
+- `Leading_Current_Power_Factor`: 0 ≤ value ≤ 1
+- `NSM`: 0 ≤ value ≤ 90000
+- `WeekStatus`: Must be "Weekday" or "Weekend"
+- `Day_of_week`: Must be valid day name
+- `Load_Type`: Must be "Light_Load", "Medium_Load", or "Maximum_Load"
+
+**Example Request:**
+```bash
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d @examples/api_request_example.json
+```
+
+**Response:**
+```json
+{
+  "predictions": [75.3, 82.1],
+  "model_version": "1.0.0",
+  "prediction_timestamp": "2025-01-15T10:30:00",
+  "n_predictions": 2
+}
+```
+
+### Testing the API
+
+**Automated test script:**
+```bash
+./examples/test_api.sh
+```
+
+**Manual testing with curl:**
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Single prediction
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": [{
+      "date": "2018-01-15 14:30:00",
+      "Lagging_Current_Reactive_Power_kVarh": 45.2,
+      "Leading_Current_Reactive_Power_kVarh": 12.5,
+      "CO2(tCO2)": 0.008,
+      "Lagging_Current_Power_Factor": 0.85,
+      "Leading_Current_Power_Factor": 0.78,
+      "NSM": 5000,
+      "WeekStatus": "Weekday",
+      "Day_of_week": "Monday",
+      "Load_Type": "Medium_Load"
+    }]
+  }'
+```
+
+**Using Python:**
+```python
+import requests
+
+# Make prediction
+response = requests.post(
+    "http://localhost:8000/predict",
+    json={
+        "data": [{
+            "date": "2018-01-15 14:30:00",
+            "Lagging_Current_Reactive_Power_kVarh": 45.2,
+            "Leading_Current_Reactive_Power_kVarh": 12.5,
+            "CO2(tCO2)": 0.008,
+            "Lagging_Current_Power_Factor": 0.85,
+            "Leading_Current_Power_Factor": 0.78,
+            "NSM": 5000,
+            "WeekStatus": "Weekday",
+            "Day_of_week": "Monday",
+            "Load_Type": "Medium_Load"
+        }]
+    }
+)
+
+result = response.json()
+print(f"Predicted energy: {result['predictions'][0]} kWh")
+```
+
+### Error Handling
+
+The API provides detailed error messages for:
+- **400 Bad Request**: Invalid input data, validation errors
+- **422 Unprocessable Entity**: Pydantic validation failures
+- **500 Internal Server Error**: Model prediction errors
+- **503 Service Unavailable**: Model not loaded
+
+**Example Error Response:**
+```json
+{
+  "error": "Invalid input data: WeekStatus must be one of ['Weekday', 'Weekend']",
+  "detail": "ValidationError...",
+  "timestamp": "2025-01-15T10:30:00"
+}
+```
+
+### Deployment Considerations
+
+**Production deployment:**
+- Use `gunicorn` or multiple `uvicorn` workers for production
+- Set up HTTPS/TLS certificates
+- Implement rate limiting
+- Add authentication/authorization
+- Use containerization (Docker)
+- Set up monitoring and logging
+
+**Example production command:**
+```bash
+gunicorn src.deployment.api:app \
+  --workers 4 \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --bind 0.0.0.0:8000
+```
+
 ## Testing
 
 ### Running Tests
@@ -176,7 +402,11 @@ def test_new_pipeline_flow(temp_data_dir, sample_raw_data):
 │   └── integration/     # Integration tests
 ├── scripts/
 │   ├── setup.sh         # One-command setup
-│   └── load_env.sh      # Load environment variables
+│   ├── load_env.sh      # Load environment variables
+│   └── start_api.sh     # Start FastAPI server
+├── examples/             # Example files for API testing
+│   ├── api_request_example.json  # Sample API request
+│   └── test_api.sh      # API testing script
 ├── pytest.ini           # Pytest configuration
 ├── .env.example         # Template for credentials
 ├── .env                 # Your credentials (not committed)
