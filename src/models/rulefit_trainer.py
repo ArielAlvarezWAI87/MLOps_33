@@ -24,6 +24,9 @@ from pathlib import Path
 import mlflow
 import mlflow.sklearn
 
+# Import reproducibility utilities
+from src.utils.reproducibility import set_seeds, RANDOM_SEED
+
 
 class RuleFitTrainer:
     """Train and export a RuleFitRegressor model."""
@@ -113,8 +116,11 @@ class RuleFitTrainer:
     # ----------------------------------------------------------------------
     def run(self):
         """Execute the full training workflow."""
+        # Set random seeds for reproducibility
+        set_seeds(RANDOM_SEED)
+
         mlflow.set_experiment("RuleFit_Training")
-        
+
         with mlflow.start_run():
             X, y = self.load_data()
             model = self.train_rulefit(X, y)
