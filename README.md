@@ -667,6 +667,142 @@ curl -X POST http://localhost:8000/predict \
 docker stop ml-service-test && docker rm ml-service-test
 ```
 
+## Data Drift Monitoring
+
+### Overview
+
+The system monitors data drift and model performance degradation to enable proactive maintenance.
+
+**Key Features:**
+- Automated drift detection using statistical tests (KS test, PSI)
+- Performance monitoring with alert thresholds
+- Multiple drift scenarios simulation
+- Recommended actions for each drift type
+
+### Quick Start
+
+**1. Generate drift scenarios:**
+```bash
+python src/monitoring/drift_simulator.py
+```
+
+**2. Run monitoring:**
+```bash
+python src/monitoring/run_drift_monitoring.py
+```
+
+**3. View reports:**
+```bash
+./scripts/view_drift_report.sh
+```
+
+### Drift Scenarios
+
+The system simulates 4 realistic drift scenarios:
+
+| Scenario | Description | Impact |
+|----------|-------------|--------|
+| **Mean Shift** | Gradual change in feature means (20% shift) | Simulates calibration drift |
+| **Missing Features** | Sensor failures (30% missing values) | Simulates hardware issues |
+| **Seasonal Change** | Energy consumption patterns (1.3× multiplier) | Simulates winter production |
+| **Combined Drift** | Multiple drift types together | Most realistic scenario |
+
+### Alert Thresholds
+
+| Metric | Threshold | Action |
+|--------|-----------|--------|
+| **KS Statistic** | > 0.1 | Feature distribution changed |
+| **PSI** | > 0.2 | Significant population shift |
+| **R² Drop** | > 10% | Model performance degraded |
+| **MAE Increase** | > 15% | Prediction error increased |
+| **RMSE Increase** | > 15% | Overall accuracy degraded |
+| **Missing Data** | > 5% | Data quality issues |
+
+### Drift Detection Results
+
+Example from monitoring:
+
+```
+Scenario: Combined Drift (Realistic)
+Status: ALERT
+Performance: R²=0.8961 (baseline: 0.9556)
+            MAE=7.8240 (baseline: 4.2230)
+            RMSE=10.7821 (baseline: 7.0438)
+Drift: 5/7 features affected
+
+Recommended Actions:
+1. HIGH PRIORITY: REVIEW_FEATURE_PIPELINE - MAE degraded 85%
+2. HIGH PRIORITY: INVESTIGATE_DATA_QUALITY - RMSE degraded 53%
+```
+
+### Recommended Actions
+
+Based on drift detection, the system recommends:
+
+| Severity | Action | When |
+|----------|--------|------|
+| **CRITICAL** | Urgent data quality investigation | Missing data > 20% |
+| **HIGH** | Retrain model immediately | Performance degradation > 30% |
+| **MEDIUM** | Review feature pipeline | Moderate drift detected |
+| **LOW** | Monitor closely | Minor drift, within thresholds |
+
+### Monitoring Reports
+
+Reports are saved to `data/monitoring/reports/`:
+
+- `summary.json` - Overall monitoring summary
+- `report_drift_*.json` - Individual scenario reports
+
+**Report structure:**
+```json
+{
+  "scenario": "Mean Shift (Gradual Drift)",
+  "overall_status": "ALERT",
+  "drift_detection": {
+    "features_with_drift": 2,
+    "drifted_features": ["Lagging_Current_Power_Factor", ...],
+    "feature_details": { ... }
+  },
+  "performance": {
+    "r2_score": 0.9055,
+    "mae": 7.4534,
+    "rmse": 10.2787
+  },
+  "baseline_comparison": {
+    "alerts": [...],
+    "degradation": { ... }
+  },
+  "recommended_actions": [...]
+}
+```
+
+### Integration with Production
+
+**Continuous Monitoring:**
+```bash
+# Run monitoring daily/hourly in production
+0 0 * * * /path/to/run_drift_monitoring.py
+```
+
+**Alert Integration:**
+- Parse JSON reports for `overall_status: "ALERT"`
+- Send notifications (email, Slack, PagerDuty)
+- Trigger automated retraining if degradation > threshold
+
+**Example alert script:**
+```bash
+#!/bin/bash
+STATUS=$(cat data/monitoring/reports/summary.json | \
+         python -c "import json, sys; \
+         data=json.load(sys.stdin); \
+         print(data['summary']['scenarios_with_alerts'])")
+
+if [ "$STATUS" -gt "0" ]; then
+    echo "⚠️ DRIFT ALERT: $STATUS scenarios need attention"
+    # Send alert notification
+fi
+```
+
 ## Project Structure
 ```
 .
