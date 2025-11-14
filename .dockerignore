@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# DVC
+.dvc/cache/
+.dvc/tmp/
+
+# MLflow
+mlruns/
+
+# Temporary files
+temp_*/
+*.log
+
+# Documentation
+*.md
+!README.md
+
+# CI/CD
+.github/
+
+# Data (will be pulled via DVC)
+# Uncomment if you want to exclude data from image
+# data/raw/*
+# data/processed/*
+# models/*
