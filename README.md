@@ -474,6 +474,199 @@ python src/models/rulefit_trainer.py
 # Results should be identical
 ```
 
+## Docker Deployment
+
+### Quick Start with Docker
+
+**Build the image:**
+```bash
+docker build -t ml-service:latest .
+```
+
+**Run the service:**
+```bash
+docker run -p 8000:8000 ml-service:latest
+```
+
+The API will be available at http://localhost:8000/docs
+
+### Docker Commands
+
+**Build:**
+```bash
+# Build with latest tag
+docker build -t ml-service:latest .
+
+# Build with specific version
+docker build -t ml-service:1.0.0 .
+```
+
+**Run:**
+```bash
+# Foreground (see logs in terminal)
+docker run -p 8000:8000 ml-service:latest
+
+# Background (detached mode)
+docker run -d -p 8000:8000 --name ml-service ml-service:latest
+
+# With custom port
+docker run -d -p 9000:8000 --name ml-service ml-service:latest
+```
+
+**Manage:**
+```bash
+# View logs
+docker logs ml-service
+docker logs -f ml-service  # Follow logs
+
+# Stop container
+docker stop ml-service
+
+# Remove container
+docker rm ml-service
+
+# View running containers
+docker ps
+
+# View all containers
+docker ps -a
+```
+
+### DockerHub Publishing
+
+**Tag and push to DockerHub:**
+```bash
+# Login to DockerHub
+docker login
+
+# Tag the image
+docker tag ml-service:latest your-username/ml-service:1.0.0
+docker tag ml-service:latest your-username/ml-service:latest
+
+# Push to DockerHub
+docker push your-username/ml-service:1.0.0
+docker push your-username/ml-service:latest
+```
+
+**Or use the publish script:**
+```bash
+export DOCKERHUB_USERNAME=your-username
+./scripts/docker_publish.sh
+```
+
+**Pull and run from DockerHub:**
+```bash
+docker pull your-username/ml-service:latest
+docker run -p 8000:8000 your-username/ml-service:latest
+```
+
+### Versioning Strategy
+
+Images are tagged with semantic versioning:
+
+- `ml-service:latest` - Latest stable version
+- `ml-service:1.0.0` - Specific patch version (exact)
+- `ml-service:1.0` - Minor version (gets updates for 1.0.x)
+- `ml-service:1` - Major version (gets updates for 1.x.x)
+
+**Example:**
+```bash
+docker pull your-username/ml-service:1.0.0  # Exact version, never changes
+docker pull your-username/ml-service:latest # Always latest, may change
+```
+
+### Image Details
+
+**Base Image:** python:3.11.3-slim
+**Size:** ~1.94GB
+**Exposed Port:** 8000
+**Health Check:** Automatic (checks `/health` endpoint every 30s)
+
+**What's included:**
+- Python 3.11.3
+- All dependencies from requirements-lock.txt (178 packages)
+- Trained model (models/rulefit.pkl)
+- Preprocessor (data/processed/preprocessor.pkl)
+- FastAPI service
+- Data processing scripts
+
+### Environment Variables
+
+Optional environment variables:
+```bash
+docker run -p 8000:8000 \
+  -e PYTHONHASHSEED=42 \
+  -e MODEL_PATH=/app/models/rulefit.pkl \
+  ml-service:latest
+```
+
+### Volume Mounts
+
+Mount external data or models:
+```bash
+docker run -p 8000:8000 \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/models:/app/models \
+  ml-service:latest
+```
+
+### Production Deployment
+
+For production use:
+```bash
+# Run with resource limits
+docker run -d \
+  --name ml-service-prod \
+  -p 8000:8000 \
+  --memory="2g" \
+  --cpus="2" \
+  --restart unless-stopped \
+  ml-service:latest
+
+# Run with logging
+docker run -d \
+  --name ml-service-prod \
+  -p 8000:8000 \
+  --log-driver json-file \
+  --log-opt max-size=10m \
+  --log-opt max-file=3 \
+  ml-service:latest
+```
+
+### Testing the Container
+
+```bash
+# Start container
+docker run -d -p 8000:8000 --name ml-service-test ml-service:latest
+
+# Wait for startup
+sleep 5
+
+# Test health
+curl http://localhost:8000/health
+
+# Test prediction
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": [{
+      "date": "2018-01-15 14:30:00",
+      "Lagging_Current_Reactive_Power_kVarh": 45.2,
+      "Leading_Current_Reactive_Power_kVarh": 12.5,
+      "CO2(tCO2)": 0.008,
+      "Lagging_Current_Power_Factor": 0.85,
+      "Leading_Current_Power_Factor": 0.78,
+      "NSM": 5000,
+      "WeekStatus": "Weekday",
+      "Day_of_week": "Monday",
+      "Load_Type": "Medium_Load"
+    }]
+  }'
+
+# Cleanup
+docker stop ml-service-test && docker rm ml-service-test
+```
+
 ## Project Structure
 ```
 .
