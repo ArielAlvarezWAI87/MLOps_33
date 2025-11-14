@@ -383,6 +383,97 @@ def test_new_pipeline_flow(temp_data_dir, sample_raw_data):
 - `temp_data_dir` - Temporary directories for testing
 - `mock_mlflow_run` - Mock MLflow tracking
 
+## Reproducibility
+
+This project implements reproducible ML pipelines using fixed dependencies, random seeds, and containerization.
+
+### Quick Reproducibility Test
+
+```bash
+# Run locally
+pytest tests/ -v  # All 30 tests should pass
+
+# Run in Docker (clean environment)
+docker-compose run --rm verify-reproducibility
+```
+
+### What Makes It Reproducible
+
+1. **Fixed Dependencies**
+   - Python 3.11.3 (`.python-version`)
+   - Pinned versions in `requirements.txt`
+   - Complete freeze in `requirements-lock.txt` (178 packages)
+
+2. **Random Seed Management**
+   - Global seed: `RANDOM_SEED = 42`
+   - Centralized in `src/utils/reproducibility.py`
+   - Applied to all stochastic operations
+
+3. **DVC Artifact Versioning**
+   - Raw data: `data/raw/`
+   - Processed data: `data/processed/`
+   - Models: `models/rulefit.pkl`
+
+4. **Docker Environment**
+   - Fixed base image: Python 3.11.3-slim
+   - Environment variable: `PYTHONHASHSEED=42`
+
+### Docker Usage
+
+**Build image:**
+```bash
+docker build -t steel-energy-mlops:latest .
+```
+
+**Run tests:**
+```bash
+docker-compose run --rm test
+```
+
+**Verify reproducibility:**
+```bash
+docker-compose run --rm verify-reproducibility
+```
+
+**Run training pipeline:**
+```bash
+docker-compose run --rm train
+```
+
+**Start API:**
+```bash
+docker-compose up api
+# Access at http://localhost:8000/docs
+```
+
+### Cross-Machine Verification
+
+**Machine A (training):**
+```bash
+# Run pipeline
+python src/data/preprocessing.py
+python src/features/feature_engineering.py
+python src/models/rulefit_trainer.py
+
+# Push artifacts
+dvc push
+git push
+```
+
+**Machine B (verification):**
+```bash
+# Pull code and data
+git pull
+dvc pull
+
+# Re-run pipeline
+python src/data/preprocessing.py
+python src/features/feature_engineering.py
+python src/models/rulefit_trainer.py
+
+# Results should be identical
+```
+
 ## Project Structure
 ```
 .
