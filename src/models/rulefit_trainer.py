@@ -14,13 +14,21 @@ Outputs:
     ../models/rulefit.pkl
 """
 
+import sys
+from pathlib import Path
+
+# Add project root to path (allows running script directly)
+if __name__ == "__main__":
+    project_root = Path(__file__).resolve().parents[2]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+
 import pandas as pd
 import numpy as np
 from semver import process
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from imodels import RuleFitRegressor
 import joblib
-from pathlib import Path
 import mlflow
 import mlflow.sklearn
 

@@ -84,21 +84,5 @@ services:
         cp data/processed/y_target.csv data/processed/y_target_run2.csv &&
         echo '' &&
         echo 'Comparing outputs...' &&
-        python -c '
-import pandas as pd
-X1 = pd.read_csv(\"data/processed/X_features_run1.csv\")
-X2 = pd.read_csv(\"data/processed/X_features_run2.csv\")
-y1 = pd.read_csv(\"data/processed/y_target_run1.csv\")
-y2 = pd.read_csv(\"data/processed/y_target_run2.csv\")
-X_match = X1.equals(X2)
-y_match = y1.equals(y2)
-print(f\"X_features match: {X_match}\")
-print(f\"y_target match: {y_match}\")
-if X_match and y_match:
-    print(\"\\n✅ SUCCESS: Pipeline is reproducible!\")
-    exit(0)
-else:
-    print(\"\\n❌ FAILURE: Outputs differ!\")
-    exit(1)
-        '
+        python scripts/compare_outputs.py
       "
