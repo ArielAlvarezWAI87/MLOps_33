@@ -12,11 +12,14 @@ import tempfile
 import shutil
 from datetime import datetime, timedelta
 
+# Import reproducibility utilities
+from src.utils.reproducibility import set_seeds
+
 
 @pytest.fixture
 def sample_raw_data():
     """Create a sample raw dataset for testing preprocessing."""
-    np.random.seed(42)
+    set_seeds(42)
     n_samples = 100
 
     # Create date range
@@ -44,7 +47,7 @@ def sample_raw_data():
 @pytest.fixture
 def sample_raw_data_with_issues():
     """Create a sample dataset with data quality issues for testing cleaning."""
-    np.random.seed(42)
+    set_seeds(42)
     n_samples = 50
 
     start_date = datetime(2018, 1, 1)
@@ -82,7 +85,7 @@ def sample_raw_data_with_issues():
 @pytest.fixture
 def sample_processed_data():
     """Create a sample processed dataset for testing feature engineering."""
-    np.random.seed(42)
+    set_seeds(42)
     n_samples = 100
 
     start_date = datetime(2018, 1, 1, 0, 0, 0)

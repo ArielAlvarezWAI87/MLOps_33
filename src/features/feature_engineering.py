@@ -30,6 +30,9 @@ import joblib
 import warnings
 warnings.filterwarnings("ignore")
 
+# Import reproducibility utilities
+from src.utils.reproducibility import set_seeds, RANDOM_SEED
+
 
 class FeatureEngineer:
     """Adds engineered features and constructs preprocessing pipelines."""
@@ -203,6 +206,9 @@ class FeatureEngineer:
     # ----------------------------------------------------------------------
     def run(self, filename: str = "steel_energy_processed.csv"):
         """Full feature engineering pipeline: load, transform, and save."""
+        # Set random seeds for reproducibility
+        set_seeds(RANDOM_SEED)
+
         df = self.load_clean_data(filename)
         df_eng = self.engineer_features(df)
 

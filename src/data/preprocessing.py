@@ -18,6 +18,9 @@ import sys
 import os
 from pathlib import Path
 
+# Import reproducibility utilities
+from src.utils.reproducibility import set_seeds, RANDOM_SEED
+
 
 class DataPreprocessor:
     """Handles loading, cleaning, and preparation of raw energy data."""
@@ -182,6 +185,9 @@ class DataPreprocessor:
     # ----------------------------------------------------------------------
     def run(self, filename: str = "steel_energy_original.csv") -> pd.DataFrame:
         """Full pipeline: load, clean, and save data."""
+        # Set random seeds for reproducibility
+        set_seeds(RANDOM_SEED)
+
         df = self.load_data(filename)
         df_clean = self.clean_data(df)
         self.save_processed(df_clean)
