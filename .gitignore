@@ -205,3 +205,6 @@ local_config.json
 # Reproducibility test artifacts
 data/processed/*_run1.csv
 data/processed/*_run2.csv
+
+# Monitoring data and reports
+data/monitoring/
