@@ -62,6 +62,101 @@ git commit -m "Update model"
 git push
 ```
 
+## Testing
+
+### Running Tests
+
+**Quick command (as specified):**
+```bash
+pytest -q
+```
+
+**Other useful commands:**
+```bash
+# Run all tests with verbose output
+pytest tests/ -v
+
+# Run only unit tests
+pytest tests/unit/
+
+# Run only integration tests
+pytest tests/integration/
+
+# Run with coverage report
+pytest tests/ --cov=src --cov-report=term-missing
+
+# Generate HTML coverage report
+pytest tests/ --cov=src --cov-report=html
+# Then open htmlcov/index.html in your browser
+
+# Run specific test file
+pytest tests/unit/test_data.py
+
+# Run tests matching a pattern
+pytest tests/ -k "preprocessing"
+```
+
+### Test Coverage
+
+Current coverage: **62%**
+- `src/data/load_data.py`: 100%
+- `src/data/preprocessing.py`: 91%
+- `src/features/feature_engineering.py`: 95%
+- `src/models/rulefit_trainer.py`: 88%
+
+### Test Structure
+
+```
+tests/
+├── conftest.py              # Shared fixtures and utilities
+├── unit/                    # Unit tests (17 tests)
+│   ├── test_data.py        # Data loading & preprocessing (11 tests)
+│   ├── test_features.py    # Feature engineering (3 tests)
+│   └── test_model.py       # Model training & prediction (5 tests)
+└── integration/             # Integration tests (2 tests)
+    └── test_pipeline.py    # End-to-end pipeline validation
+```
+
+### What is Tested
+
+**Unit Tests:**
+- ✅ Data loading and validation
+- ✅ Data preprocessing and cleaning
+- ✅ Data quality rules (power factor, CO2, NSM limits)
+- ✅ Missing value handling
+- ✅ Feature engineering (temporal, cyclical, power features)
+- ✅ Model training with RuleFit
+- ✅ Model serialization/deserialization
+- ✅ Prediction workflows
+
+**Integration Tests:**
+- ✅ End-to-end pipeline: data → preprocessing → features → model
+- ✅ Data flow consistency across pipeline stages
+
+### Adding New Tests
+
+1. **For unit tests**, add to appropriate file in `tests/unit/`:
+```python
+@pytest.mark.unit
+def test_my_new_feature(sample_data):
+    # Your test here
+    assert result == expected
+```
+
+2. **For integration tests**, add to `tests/integration/test_pipeline.py`:
+```python
+@pytest.mark.integration
+def test_new_pipeline_flow(temp_data_dir, sample_raw_data):
+    # Your test here
+    assert pipeline_works
+```
+
+3. **Use fixtures** from `tests/conftest.py`:
+- `sample_raw_data` - Mock raw dataset
+- `sample_processed_data` - Mock processed dataset
+- `temp_data_dir` - Temporary directories for testing
+- `mock_mlflow_run` - Mock MLflow tracking
+
 ## Project Structure
 ```
 .
@@ -70,9 +165,19 @@ git push
 │   └── processed/        # Processed data (DVC tracked)
 ├── models/               # Trained models (DVC tracked)
 ├── src/                  # Source code
+│   ├── data/            # Data loading and preprocessing
+│   ├── features/        # Feature engineering
+│   ├── models/          # Model training and prediction
+│   ├── evaluation/      # Model evaluation
+│   └── deployment/      # API and deployment
+├── tests/                # Test suite (19 tests, 62% coverage)
+│   ├── conftest.py      # Shared test fixtures
+│   ├── unit/            # Unit tests
+│   └── integration/     # Integration tests
 ├── scripts/
 │   ├── setup.sh         # One-command setup
 │   └── load_env.sh      # Load environment variables
+├── pytest.ini           # Pytest configuration
 ├── .env.example         # Template for credentials
 ├── .env                 # Your credentials (not committed)
 ├── requirements.txt     # Python dependencies
