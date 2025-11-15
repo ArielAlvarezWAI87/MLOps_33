@@ -357,10 +357,12 @@ fi
 │   ├── unit/            # 26 unit tests
 │   └── integration/     # 4 integration tests
 ├── scripts/
-│   ├── setup.sh         # One-command setup
-│   ├── start_api.sh     # Start FastAPI
-│   ├── docker_publish.sh # Publish to DockerHub
-│   └── view_drift_report.sh # View monitoring results
+│   ├── setup.sh              # One-command setup
+│   ├── load_env.sh           # Load environment variables
+│   ├── start_api.sh          # Start FastAPI server
+│   ├── docker_publish.sh     # Publish to DockerHub
+│   ├── view_drift_report.sh  # View drift monitoring results
+│   └── compare_outputs.py    # Compare pipeline outputs (for Docker reproducibility test)
 ├── examples/             # API testing examples
 ├── Dockerfile           # Container definition
 ├── docker-compose.yml   # Multi-service orchestration
