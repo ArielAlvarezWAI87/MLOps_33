@@ -433,3 +433,12 @@ rm -rf .venv .dvc
 # Run setup again
 ./scripts/setup.sh
 ```
+
+## Model Evaluation and Data Drift Monitoring
+
+### Offline model evaluation
+
+Once the project is set up (`./scripts/setup.sh`, environment activated and `dvc pull` completed), you can run an offline evaluation of the current model:
+
+```bash
+python -m src.evaluation.evaluate
