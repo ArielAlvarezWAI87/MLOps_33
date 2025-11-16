@@ -1,0 +1,12 @@
+# dataset_snapshot.dvc
+# Snapshot of the raw dataset tracked with DVC for reproducibility.
+
+outs:
+  - path: data/raw/steel_energy_original.csv
+    desc: Raw steel energy dataset used as the single source of truth
+    # The following fields (hash, size, etc.) will be auto-filled by DVC
+    # once you actually run `dvc add data/raw/steel_energy_original.csv`.
+    # Example (do NOT hard-code):
+    # md5: <auto-filled by DVC>
+    # size: <auto-filled by DVC>
+    # nfiles: 1

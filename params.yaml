@@ -1,0 +1,394 @@
+# ============================================================================
+# Pipeline Parameters Configuration
+# ============================================================================
+# Usage:
+#   - Modify parameters in this file
+#   - Run: dvc repro
+#   - DVC automatically detects changes and reruns affected stages
+#   - Compare experiments: dvc params diff
+#
+# Git tracks this file, enabling parameter versioning
+# ============================================================================
+
+# ==========================================================================
+# PREPROCESSING PARAMETERS
+# ==========================================================================
+preprocessing:
+  # Directory paths
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  
+  # Data quality rules - maximum thresholds before correction
+  quality_rules:
+    max_power_factor: 100  # Values > 100 divided by 100
+    max_co2: 0.02  # Values > 0.2 divided by 100000
+    max_lagging_reactive_power: 96.91  # Values > 100 divided by 100
+    max_leading_reactive_power: 27.76  # Values > 27.76 divided by 1000
+    max_nsm: 85500  # Values > 85500 divided by 100
+    max_usage_kwh: 157.18  # Values > 157.18 divided by 1000
+  
+  # Missing value handling
+  missing_values:
+    usage_kwh_strategy: "median_by_load_type"  # Options: median, mean, zero
+    other_numeric_strategy: "zero"  # Fill with 0
+    categorical_strategy: "mode"  # Use most frequent value
+  
+  # Categorical transformations
+  categorical:
+    uppercase: true
+    strip_whitespace: true
+    null_values: ["NAN", "NA", "NONE", "NULL", ""]
+
+# ==========================================================================
+# FEATURE ENGINEERING PARAMETERS
+# ==========================================================================
+feature_engineering:
+  # Directory paths
+  raw_processed_dir: "data/processed"
+  save_dir: "data/processed"
+  
+  # Temporal features configuration
+  temporal_features:
+    enable: true
+    features:
+      - year
+      - month
+      - day
+      - hour
+      - day_of_week_num
+      - quarter
+      - is_weekend
+  
+  # Cyclical encoding configuration
+  cyclical_features:
+    enable: true
+    features:
+      hour:
+        period: 24
+        sin_cos: true
+      month:
+        period: 12
+        sin_cos: true
+      day_of_week:
+        period: 7
+        sin_cos: true
+  
+  # Power factor features
+  power_factor_features:
+    enable: true
+    features:
+      - power_factor_ratio
+      - power_factor_diff
+      - avg_power_factor
+    epsilon: 1e-6  # Prevent division by zero
+  
+  # Reactive power features
+  reactive_power_features:
+    enable: true
+    features:
+      - reactive_power_total
+      - reactive_power_diff
+      - reactive_power_ratio
+    epsilon: 1e-6
+  
+  # Energy efficiency features
+  efficiency_features:
+    enable: true
+    features:
+      - co2_per_kwh
+      - is_high_consumption
+      - nsm_per_kwh
+    epsilon: 1e-6
+  
+  # Preprocessing pipeline configuration
+  preprocessing_pipeline:
+    # Skewed numeric features (apply log1p + MinMaxScaler)
+    num_skew:
+      - Lagging_Current_Reactive.Power_kVarh
+      - Leading_Current_Reactive_Power_kVarh
+      - CO2(tCO2)
+      - reactive_power_total
+      - NSM
+      - co2_per_kwh
+      - nsm_per_kwh
+    
+    # Linear numeric features (apply MinMaxScaler only)
+    num_lin:
+      - Lagging_Current_Power_Factor
+      - Leading_Current_Power_Factor
+      - hour
+      - hour_sin
+      - hour_cos
+      - dow_sin
+      - dow_cos
+      - month_sin
+      - month_cos
+      - power_factor_ratio
+      - power_factor_diff
+      - avg_power_factor
+      - reactive_power_diff
+      - reactive_power_ratio
+      - year
+      - month
+      - day
+      - quarter
+      - day_of_week_num
+      - is_weekend
+      - is_high_consumption
+    
+    # Nominal categorical features (OneHotEncoder)
+    cat_nom:
+      - WeekStatus
+    
+    # Ordinal categorical features (OrdinalEncoder)
+    cat_ord:
+      - Load_Type
+    
+    # Imputation strategies
+    imputation:
+      numeric_strategy: "median"
+      categorical_strategy: "most_frequent"
+    
+    # Scaling
+    scaling:
+      numeric_scaler: "minmax"  # Options: minmax, standard, robust
+    
+    # Encoding
+    encoding:
+      onehot_drop: "first"  # Drop first category to avoid multicollinearity
+      onehot_handle_unknown: "ignore"
+      ordinal_categories:
+        Load_Type:
+          - LIGHT_LOAD
+          - MEDIUM_LOAD
+          - MAXIMUM_LOAD
+      ordinal_unknown_value: -1
+
+# ==========================================================================
+# MODEL TRAINING PARAMETERS
+# ==========================================================================
+train:
+  # Directory paths
+  data_dir: "data/processed"
+  model_dir: "models"
+  
+  # RuleFit hyperparameters
+  rulefit:
+    max_rules: 30
+    tree_size: 4
+    random_state: 42
+    exp_rand_tree_size: true
+    memory_par: 0.01
+    n_jobs: -1
+    
+    # Tree generator hyperparameters
+    tree_generator:
+      max_depth: 4
+      min_samples_split: 2
+      min_samples_leaf: 1
+      max_features: "sqrt"
+  
+  # Training configuration
+  training:
+    test_size: 0.2
+    validation_split: 0.1
+    shuffle: true
+    stratify: false
+  
+  # MLflow configuration
+  mlflow:
+    experiment_name: "RuleFit_Training"
+    tracking_uri: "mlruns"
+    log_params: true
+    log_metrics: true
+    log_model: true
+    log_artifacts: true
+  
+  # Early stopping (if applicable)
+  early_stopping:
+    enable: false
+    patience: 10
+    min_delta: 0.001
+
+# ==========================================================================
+# MODEL EVALUATION PARAMETERS
+# ==========================================================================
+evaluate:
+  # Data split
+  test_size: 0.2
+  random_state: 42
+  shuffle: true
+  
+  # Metrics to compute
+  metrics:
+    - r2_score
+    - mean_absolute_error
+    - mean_squared_error
+    - root_mean_squared_error
+    - mean_absolute_percentage_error
+    - median_absolute_error
+  
+  # Cross-validation
+  cross_validation:
+    enable: true
+    n_folds: 5
+    scoring: "neg_mean_squared_error"
+  
+  # Residual analysis
+  residual_analysis:
+    enable: true
+    plot_residuals: true
+    plot_qq: true
+    plot_predictions: true
+  
+  # Feature importance
+  feature_importance:
+    enable: true
+    top_n: 20
+    plot: true
+
+# ==========================================================================
+# MODEL PREDICTION PARAMETERS
+# ==========================================================================
+predict:
+  # Input data
+  input_file: "data/processed/steel_energy_processed.csv"
+  
+  # Output configuration
+  output_dir: "predictions"
+  output_file: "predictions_output.csv"
+  
+  # MLflow configuration
+  log_to_mlflow: true
+  experiment_name: "rulefit_predictions"
+  run_name: "prediction_{timestamp}"
+  log_model: true
+  register_model: null  # Set to model name to register, e.g., "rulefit_steel_energy_model"
+  
+  # Model loading
+  model_source: "file"  # Options: file, mlflow_registry, mlflow_run
+  model_path: "models/rulefit.pkl"
+  model_registry:
+    model_name: null
+    version: null  # Specific version number or null for latest
+    stage: null  # Production, Staging, or null
+  
+  # Prediction configuration
+  batch_size: 1000  # For large datasets
+  save_probabilities: false  # For classification tasks
+  save_feature_contributions: false  # For explainability
+
+# ==========================================================================
+# DATA VERSIONING PARAMETERS (DVC)
+# ==========================================================================
+dvc:
+  # Remote storage configuration
+  remote:
+    name: "myremote"
+    url: null  # Set to your remote storage URL
+    # Examples:
+    # url: "s3://mybucket/dvc-storage"
+    # url: "gs://mybucket/dvc-storage"
+    # url: "/path/to/local/storage"
+  
+  # Cache configuration
+  cache:
+    dir: ".dvc/cache"
+    type: "copy"  # Options: copy, symlink, hardlink, reflink
+  
+  # Pipeline configuration
+  pipeline:
+    auto_stage: true
+    force: false
+    single_item: false
+
+# ==========================================================================
+# EXPERIMENT TRACKING PARAMETERS
+# ==========================================================================
+experiment:
+  # Experiment metadata
+  name: "steel_energy_consumption"
+  description: "Energy consumption prediction for steel manufacturing"
+  tags:
+    - steel_industry
+    - energy_prediction
+    - rulefit
+    - mlops
+  
+  # Git integration
+  git:
+    track_commits: true
+    require_clean: false
+  
+  # Reproducibility
+  seed: 42
+  deterministic: true
+
+# ==========================================================================
+# LOGGING AND MONITORING PARAMETERS
+# ==========================================================================
+logging:
+  # Logging level
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  
+  # Log format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # Log files
+  file:
+    enable: true
+    path: "logs/pipeline.log"
+    max_bytes: 10485760  # 10 MB
+    backup_count: 5
+  
+  # Console output
+  console:
+    enable: true
+    colorize: true
+
+# ==========================================================================
+# PERFORMANCE PARAMETERS
+# ==========================================================================
+performance:
+  # Parallel processing
+  n_jobs: -1  # Use all available cores
+  
+  # Memory management
+  memory_limit_gb: 8
+  low_memory: false
+  
+  # Caching
+  cache_intermediate: true
+  cache_preprocessor: true
+
+# ==========================================================================
+# DEPLOYMENT PARAMETERS
+# ==========================================================================
+deployment:
+  # Model serving
+  serving:
+    port: 8000
+    host: "0.0.0.0"
+    workers: 4
+  
+  # API configuration
+  api:
+    version: "v1"
+    title: "Steel Energy Prediction API"
+    description: "Predict energy consumption for steel manufacturing"
+  
+  # Monitoring
+  monitoring:
+    enable_metrics: true
+    enable_logging: true
+    enable_alerts: false
+
+# ==========================================================================
+# NOTES
+# ==========================================================================
+# - All paths are relative to project root
+# - Parameters can be accessed in Python scripts via DVC params
+# - Modify parameters here and run 'dvc repro' to retrigger pipeline
+# - Use 'dvc params diff' to compare parameter changes
+# - Git tracks this file for full experiment reproducibility
+# ============================================================================

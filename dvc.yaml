@@ -1,0 +1,315 @@
+# ============================================================================
+# DVC Pipeline Configuration - Steel Energy Consumption Prediction
+# ============================================================================
+#
+# DVC Pipeline Features:
+#   - Automatic dependency tracking
+#   - Caching of intermediate results
+#   - Parallel execution where possible
+#   - Reproducible experiments
+#   - Version control for data and models
+#
+# Usage:
+#   dvc repro                    # Run entire pipeline
+#   dvc repro -s preprocessing   # Run specific stage
+#   dvc dag                      # Visualize pipeline DAG
+#   dvc metrics show             # Show model metrics
+#   dvc params diff              # Compare parameters
+#
+# Pipeline Flow:
+#   raw_data → preprocessing → feature_engineering → model_training → model_prediction
+# ============================================================================
+
+stages:
+  # ==========================================================================
+  # STAGE 1: DATA PREPROCESSING
+  # ==========================================================================
+  # Clean and prepare raw steel energy data for feature engineering
+  # Input:  data/raw/steel_energy_original.csv
+  # Output: data/processed/steel_energy_processed.csv
+  
+  preprocessing:
+    cmd: python src/data/preprocessing.py
+    deps:
+      - src/data/preprocessing.py
+      - data/raw/steel_energy_original.csv
+    params:
+      - preprocessing.raw_dir
+      - preprocessing.processed_dir
+    outs:
+      - data/processed/steel_energy_processed.csv:
+          cache: true
+          persist: true
+    desc: >
+      Clean and preprocess raw energy consumption data:
+        - Convert data types (numeric, datetime, categorical)
+        - Handle missing values (median for Usage_kWh, 0 for others)
+        - Apply data quality rules:
+          * Power factors > 100 → divide by 100
+          * CO2 > 0.2 → divide by 100000
+          * Reactive power corrections
+          * NSM and Usage_kWh scaling
+        - Standardize categorical values (uppercase)
+    
+  # ==========================================================================
+  # STAGE 2: FEATURE ENGINEERING
+  # ==========================================================================
+  # Create engineered features and build preprocessing pipeline
+  # Input:  data/processed/steel_energy_processed.csv
+  # Output: X_features.csv, y_target.csv, preprocessor.pkl
+  
+  feature_engineering:
+    cmd: python src/features/feature_engineering.py
+    deps:
+      - src/features/feature_engineering.py
+      - data/processed/steel_energy_processed.csv
+    params:
+      - feature_engineering.raw_processed_dir
+      - feature_engineering.save_dir
+    outs:
+      - data/processed/X_features.csv:
+          cache: true
+          persist: true
+      - data/processed/y_target.csv:
+          cache: true
+          persist: true
+      - data/processed/preprocessor.pkl:
+          cache: true
+          persist: true
+      - data/processed/feature_info.pkl:
+          cache: true
+          persist: false
+    desc: >
+      Engineer features and build preprocessing pipeline:
+        - Temporal features (year, month, day, hour, quarter, is_weekend)
+        - Cyclical encodings (hour_sin/cos, month_sin/cos, dow_sin/cos)
+        - Power factor features (ratio, diff, average)
+        - Reactive power features (total, diff, ratio)
+        - Energy efficiency indicators (co2_per_kwh, is_high_consumption, nsm_per_kwh)
+        - Build ColumnTransformer with 4 pipelines:
+          * Skewed numeric → log1p + MinMaxScaler
+          * Linear numeric → MinMaxScaler
+          * Nominal categorical → OneHotEncoder
+          * Ordinal categorical → OrdinalEncoder
+
+  # ==========================================================================
+  # STAGE 3: MODEL TRAINING - RULEFIT
+  # ==========================================================================
+  # Train RuleFitRegressor model for energy consumption prediction
+  # Input:  X_features.csv, y_target.csv
+  # Output: models/rulefit.pkl, mlruns/ (MLflow tracking)
+  
+  train_rulefit:
+    cmd: python src/models/rulefit_trainer.py
+    deps:
+      - src/models/rulefit_trainer.py
+      - data/processed/X_features.csv
+      - data/processed/y_target.csv
+    params:
+      - train.max_rules
+      - train.tree_size
+      - train.random_state
+      - train.exp_rand_tree_size
+    outs:
+      - models/rulefit.pkl:
+          cache: true
+          persist: true
+    metrics:
+      - metrics/rulefit_metrics.json:
+          cache: false
+    desc: >
+      Train RuleFitRegressor model:
+        - Interpretable rule-based regression
+        - Combines decision rules with linear model
+        - Hyperparameters: max_rules, tree_size
+        - MLflow experiment tracking enabled
+        - Metrics: R², MAE, RMSE
+
+  # ==========================================================================
+  # STAGE 4: MODEL EVALUATION (Optional)
+  # ==========================================================================
+  # Evaluate trained model on test set
+  # Input:  models/rulefit.pkl, preprocessor.pkl, test data
+  # Output: metrics/evaluation_metrics.json
+  
+  evaluate:
+    cmd: python src/models/evaluate_model.py
+    deps:
+      - src/models/evaluate_model.py
+      - models/rulefit.pkl
+      - data/processed/preprocessor.pkl
+      - data/processed/X_features.csv
+      - data/processed/y_target.csv
+    params:
+      - evaluate.test_size
+      - evaluate.random_state
+    metrics:
+      - metrics/evaluation_metrics.json:
+          cache: false
+      - metrics/confusion_matrix.json:
+          cache: false
+    plots:
+      - plots/residuals.csv:
+          template: scatter
+          x: predicted
+          y: residual
+      - plots/predictions_vs_actual.csv:
+          template: scatter
+          x: actual
+          y: predicted
+    desc: >
+      Evaluate model performance:
+        - Train/test split evaluation
+        - Regression metrics (R², MAE, RMSE, MAPE)
+        - Residual analysis
+        - Prediction vs actual plots
+
+  # ==========================================================================
+  # STAGE 5: MODEL PREDICTION (Optional)
+  # ==========================================================================
+  # Run inference on new data
+  # Input:  models/rulefit.pkl, preprocessor.pkl, new data
+  # Output: predictions/predictions_output.csv
+  
+  predict:
+    cmd: python src/models/model_prediction.py
+    deps:
+      - src/models/model_prediction.py
+      - models/rulefit.pkl
+      - data/processed/preprocessor.pkl
+      - data/processed/steel_energy_processed.csv
+    params:
+      - predict.log_to_mlflow
+      - predict.register_model
+    outs:
+      - predictions/predictions_output.csv:
+          cache: false
+          persist: true
+    desc: >
+      Generate predictions on new data:
+        - Load trained model and preprocessor
+        - Apply feature engineering
+        - Generate predictions
+        - Log to MLflow (optional)
+        - Register model in Model Registry (optional)
+
+# ============================================================================
+# PARAMETERS CONFIGURATION
+# ============================================================================
+# Define parameters for each stage
+# These can be modified in params.yaml and tracked with Git
+# DVC automatically detects parameter changes and reruns affected stages
+
+params:
+  - params.yaml:
+      - preprocessing
+      - feature_engineering
+      - train
+      - evaluate
+      - predict
+
+# ============================================================================
+# METRICS CONFIGURATION
+# ============================================================================
+# Define metrics to track across experiments
+# DVC provides commands to compare metrics across runs
+
+metrics:
+  - metrics/rulefit_metrics.json
+  - metrics/evaluation_metrics.json
+
+# ============================================================================
+# PLOTS CONFIGURATION
+# ============================================================================
+# Define plots for visualization
+# DVC can generate plots from tracked CSV files
+
+plots:
+  - plots/residuals.csv:
+      template: scatter
+      x: predicted
+      y: residual
+      title: "Residual Plot"
+      x_label: "Predicted Usage (kWh)"
+      y_label: "Residual"
+  
+  - plots/predictions_vs_actual.csv:
+      template: scatter
+      x: actual
+      y: predicted
+      title: "Predictions vs Actual"
+      x_label: "Actual Usage (kWh)"
+      y_label: "Predicted Usage (kWh)"
+  
+  - plots/feature_importance.csv:
+      template: bar_horizontal
+      x: importance
+      y: feature
+      title: "Feature Importance"
+      x_label: "Importance Score"
+      y_label: "Feature Name"
+
+# ============================================================================
+# ARTIFACTS CONFIGURATION
+# ============================================================================
+# Track additional artifacts (models, preprocessors, etc.)
+
+artifacts:
+  models:
+    - models/rulefit.pkl
+  
+  preprocessors:
+    - data/processed/preprocessor.pkl
+  
+  features:
+    - data/processed/feature_info.pkl
+
+# ============================================================================
+# NOTES AND BEST PRACTICES
+# ============================================================================
+# 
+# 1. RUNNING THE PIPELINE:
+#    - Full pipeline:     dvc repro
+#    - Specific stage:    dvc repro -s <stage_name>
+#    - Force rerun:       dvc repro -f
+#    - Single stage:      dvc repro -s preprocessing --single-item
+#
+# 2. INSPECTING THE PIPELINE:
+#    - View DAG:          dvc dag
+#    - Check status:      dvc status
+#    - Show metrics:      dvc metrics show
+#    - Compare metrics:   dvc metrics diff
+#
+# 3. PARAMETER EXPERIMENTS:
+#    - Edit params.yaml
+#    - Run: dvc repro
+#    - DVC automatically reruns affected stages
+#
+# 4. CACHING:
+#    - DVC caches all outputs
+#    - Reuses cached results when dependencies unchanged
+#    - Significantly speeds up pipeline execution
+#
+# 5. REPRODUCIBILITY:
+#    - Git tracks: dvc.yaml, params.yaml, .dvc files
+#    - DVC tracks: actual data and model files
+#    - Checkout any commit → dvc checkout → exact reproduction
+#
+# 6. COLLABORATION:
+#    - Push code:    git push
+#    - Push data:    dvc push
+#    - Pull code:    git pull
+#    - Pull data:    dvc pull
+#
+# 7. EXPERIMENT TRACKING:
+#    - MLflow for detailed experiment tracking
+#    - DVC for pipeline-level versioning
+#    - Both complement each other
+#
+# 8. REMOTE STORAGE:
+#    - Configure: dvc remote add -d myremote <url>
+#    - S3:        s3://mybucket/path
+#    - GCS:       gs://mybucket/path
+#    - Local:     /path/to/storage
+#
+# ============================================================================
