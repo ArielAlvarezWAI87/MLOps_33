@@ -34,8 +34,9 @@ DVC_S3_PATH=202502-equipo0
 ### Daily Workflow
 
 ```bash
-# Activate and pull latest
-source .venv/bin/activate
+# Activate and pull latest 
+source .venv/bin/activate #MAC/LINUX
+source .venv/Scripts/activate #WINDOWS
 source scripts/load_env.sh
 dvc pull
 
