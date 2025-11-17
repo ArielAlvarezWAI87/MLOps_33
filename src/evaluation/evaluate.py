@@ -86,7 +86,7 @@ def simulate_drift(X: pd.DataFrame, shift_fraction=0.2):
 
 
 # ============================================================
-# BASELINE EVALUATION (NO X/Y FILES NEEDED)
+# BASELINE EVALUATION
 # ============================================================
 
 def evaluate_model(
@@ -97,9 +97,8 @@ def evaluate_model(
     run="baseline"
 ):
     """
-    Full end-to-end evaluation:
-
-    processed CSV → FeatureEngineering.run() → X_processed,y → predict → metrics
+    Full end-to-end evaluation (baseline):
+    processed CSV → FeatureEngineering → predict → metrics
     """
 
     # --------------------------------------------------------
@@ -108,7 +107,7 @@ def evaluate_model(
     df_clean = load_clean_dataframe(processed_csv_path)
 
     # --------------------------------------------------------
-    # 2) REBUILD FEATURES (exactly like training)
+    # 2) REBUILD FEATURES
     # --------------------------------------------------------
     fe = FeatureEngineer(
         raw_processed_dir="data/processed",
@@ -136,83 +135,103 @@ def evaluate_model(
     if log_to_mlflow:
         mlflow.set_experiment(experiment)
         with mlflow.start_run(run_name=run):
+
+            # Parameters
+            mlflow.log_param("processed_csv", processed_csv_path)
+            mlflow.log_param("model_path", model_path)
+
+            # Metrics
             for k, v in metrics.items():
-                mlflow.log_metric(k, v)
-            mlflow.sklearn.log_model(model, "rulefit_model")
+                mlflow.log_metric(f"baseline_{k}", v)
+
+            # Artifacts
+            mlflow.log_artifact(model_path, artifact_path="model")
+
+            preprocessor_path = "data/tmp/preprocessor.pkl"
+            joblib.dump(preprocessor, preprocessor_path)
+            mlflow.log_artifact(preprocessor_path, artifact_path="preprocessor")
 
     return metrics
 
 
 # ============================================================
-# DRIFT EVALUATION (NO X/Y FILES)
+# DRIFT EVALUATION
 # ============================================================
 
 def evaluate_model_with_drift(
     processed_csv_path: str,
     model_path: str,
     shift_fraction=0.25,
-    log_to_mlflow=False
+    log_to_mlflow=False,
+    experiment="offline_eval",
+    run="drift_eval"
 ):
     """
-    Evalúa un modelo RuleFit comparando rendimiento base vs drift.
-    Si log_to_mlflow=True, registra parámetros, métricas y artefactos.
+    Evaluate a model under baseline and drifted conditions.
     """
-    # =============================
-    # Cargar datos
-    # =============================
+
+    # --------------------------------------------------------
+    # 1) LOAD CLEANED DATA
+    # --------------------------------------------------------
     df_clean = load_clean_dataframe(processed_csv_path)
 
-    fe = FeatureEngineer("data/processed", "data/tmp")
-    X_processed, y, preprocessor = fe.run(filename=Path(processed_csv_path).name)
+    # --------------------------------------------------------
+    # 2) REBUILD FEATURES
+    # --------------------------------------------------------
+    fe = FeatureEngineer(
+        raw_processed_dir="data/processed",
+        save_dir="data/tmp"
+    )
 
-    # =============================
-    # Cargar modelo RuleFit
-    # =============================
+    X_processed, y, preprocessor = fe.run(
+        filename=Path(processed_csv_path).name
+    )
+
+    # --------------------------------------------------------
+    # 3) LOAD MODEL
+    # --------------------------------------------------------
     model = load_rulefit_model(model_path)
 
-    # =============================
-    # Métricas base
-    # =============================
+    # --------------------------------------------------------
+    # 4) BASELINE METRICS
+    # --------------------------------------------------------
     y_pred_base = model.predict(X_processed)
-    base = compute_regression_metrics(y, y_pred_base)
+    baseline_metrics = compute_regression_metrics(y, y_pred_base)
 
-    # =============================
-    # Simulación de drift
-    # =============================
+    # --------------------------------------------------------
+    # 5) DRIFTED METRICS
+    # --------------------------------------------------------
     X_drift = simulate_drift(X_processed, shift_fraction)
     y_pred_drift = model.predict(X_drift)
-    drift = compute_regression_metrics(y, y_pred_drift)
+    drift_metrics = compute_regression_metrics(y, y_pred_drift)
 
-    # =============================
-    # Logging a MLflow
-    # =============================
+    # --------------------------------------------------------
+    # 6) OPTIONAL MLflow logging
+    # --------------------------------------------------------
     if log_to_mlflow:
-        with mlflow.start_run(run_name="rulefit-drift-evaluation"):
+        mlflow.set_experiment(experiment)
+        with mlflow.start_run(run_name=run):
 
-            # Parámetros relevantes
-            mlflow.log_param("shift_fraction", shift_fraction)
+            # Parameters
             mlflow.log_param("processed_csv", processed_csv_path)
             mlflow.log_param("model_path", model_path)
+            mlflow.log_param("shift_fraction", shift_fraction)
 
-            # Métricas base
-            for k, v in base.items():
-                mlflow.log_metric(f"base_{k}", v)
+            # Metrics
+            for k, v in baseline_metrics.items():
+                mlflow.log_metric(f"baseline_{k}", v)
 
-            # Métricas con drift
-            for k, v in drift.items():
+            for k, v in drift_metrics.items():
                 mlflow.log_metric(f"drift_{k}", v)
 
-            # Artefactos: modelo y preprocesador
+            # Artifacts
             mlflow.log_artifact(model_path, artifact_path="model")
 
-            # Guardado opcional del preprocessing
             preprocessor_path = "data/tmp/preprocessor.pkl"
             joblib.dump(preprocessor, preprocessor_path)
             mlflow.log_artifact(preprocessor_path, artifact_path="preprocessor")
 
-            print("\nMLflow logging complete.\n")
-
-    return {"drift": drift}
+    return {"drift": drift_metrics}
 
 # ============================================================
 # MAIN EXECUTION
