@@ -153,24 +153,66 @@ def evaluate_model_with_drift(
     shift_fraction=0.25,
     log_to_mlflow=False
 ):
+    """
+    Evalúa un modelo RuleFit comparando rendimiento base vs drift.
+    Si log_to_mlflow=True, registra parámetros, métricas y artefactos.
+    """
+    # =============================
+    # Cargar datos
+    # =============================
     df_clean = load_clean_dataframe(processed_csv_path)
 
     fe = FeatureEngineer("data/processed", "data/tmp")
     X_processed, y, preprocessor = fe.run(filename=Path(processed_csv_path).name)
 
+    # =============================
+    # Cargar modelo RuleFit
+    # =============================
     model = load_rulefit_model(model_path)
 
-    # Base
+    # =============================
+    # Métricas base
+    # =============================
     y_pred_base = model.predict(X_processed)
     base = compute_regression_metrics(y, y_pred_base)
 
-    # Drifted
+    # =============================
+    # Simulación de drift
+    # =============================
     X_drift = simulate_drift(X_processed, shift_fraction)
     y_pred_drift = model.predict(X_drift)
     drift = compute_regression_metrics(y, y_pred_drift)
 
-    return {"drift": drift}
+    # =============================
+    # Logging a MLflow
+    # =============================
+    if log_to_mlflow:
+        with mlflow.start_run(run_name="rulefit-drift-evaluation"):
 
+            # Parámetros relevantes
+            mlflow.log_param("shift_fraction", shift_fraction)
+            mlflow.log_param("processed_csv", processed_csv_path)
+            mlflow.log_param("model_path", model_path)
+
+            # Métricas base
+            for k, v in base.items():
+                mlflow.log_metric(f"base_{k}", v)
+
+            # Métricas con drift
+            for k, v in drift.items():
+                mlflow.log_metric(f"drift_{k}", v)
+
+            # Artefactos: modelo y preprocesador
+            mlflow.log_artifact(model_path, artifact_path="model")
+
+            # Guardado opcional del preprocessing
+            preprocessor_path = "data/tmp/preprocessor.pkl"
+            joblib.dump(preprocessor, preprocessor_path)
+            mlflow.log_artifact(preprocessor_path, artifact_path="preprocessor")
+
+            print("\nMLflow logging complete.\n")
+
+    return {"drift": drift}
 
 # ============================================================
 # MAIN EXECUTION
@@ -186,7 +228,7 @@ if __name__ == "__main__":
     
 
     print("\n🌪 DRIFT EVALUATION")
-    drift = evaluate_model_with_drift(PROCESSED_PATH, MODEL_PATH)
+    drift = evaluate_model_with_drift(PROCESSED_PATH, MODEL_PATH,log_to_mlflow=False)
     
     print("\n--- RESULTS ---")
     print("BASELINE METRICS:", base)
