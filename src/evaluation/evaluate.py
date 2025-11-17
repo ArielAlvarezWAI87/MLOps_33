@@ -1,270 +1,190 @@
 """
-Módulo de evaluación del modelo RuleFit para
-consumo de energía en acero.
+evaluate.py — SELF-SUFFICIENT VERSION
+───────────────────────────────────────────────────────────────
+This evaluator does NOT require:
+    data/tmp/X_features.csv
+    data/tmp/y_target.csv
 
-Responsabilidades:
-- Cargar datos procesados (X_features, y_target).
-- Cargar el modelo entrenado.
-- Calcular métricas de regresión (MAE, RMSE, R2).
-- Opcionalmente registrar resultados en MLflow.
-- Simular data drift y evaluar el impacto en el desempeño.
+It instead loads:
+    data/processed/steel_energy_processed.csv
+
+And internally runs:
+    FeatureEngineer.run()
+
+So that evaluation ALWAYS uses the correct:
+    engineered + scaled features
+    target
+    preprocessor
+matching exactly the training pipeline.
 """
 
 from pathlib import Path
-from typing import Dict, Optional
-
-import joblib
+from typing import Dict
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-
-from src.data.load_data import load_processed_data
-from config.mlflow_config import MLflowConfig
+import joblib
 import mlflow
+import sys
+import os
 
 
-def load_model(model_path: str = "models/rulefit.pkl"):
-    """
-    Carga el modelo entrenado desde disco.
+# ============================================================
+# IMPORT PHASE 2 MODULES
+# ============================================================
 
-    Parameters
-    ----------
-    model_path : str
-        Ruta relativa al archivo .pkl del modelo entrenado.
-
-    Returns
-    -------
-    model :
-        Modelo ya cargado listo para hacer predicciones.
-    """
-    path = Path(model_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Model file not found: {path}")
-
-    model = joblib.load(path)
-    return model
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+from src.features.feature_engineering import FeatureEngineer
+from src.data.preprocessing import DataPreprocessor
 
 
-def compute_regression_metrics(
-    y_true: np.ndarray,
-    y_pred: np.ndarray
-) -> Dict[str, float]:
-    """
-    Calcula métricas de regresión estándar.
+# ============================================================
+# LOAD CLEANED DATAFRAME
+# ============================================================
 
-    Returns
-    -------
-    metrics : dict
-        Diccionario con MAE, RMSE y R2.
-    """
+def load_clean_dataframe(path: str):
+    df = pd.read_csv(path, parse_dates=["date"])
+    return df
+
+
+# ============================================================
+# LOAD MODEL
+# ============================================================
+
+def load_rulefit_model(path: str):
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Model file not found: {p}")
+    return joblib.load(p)
+
+
+# ============================================================
+# METRICS
+# ============================================================
+
+def compute_regression_metrics(y_true, y_pred):
+    from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
+
     mae = mean_absolute_error(y_true, y_pred)
-
-    # Algunas versiones de scikit-learn no soportan el argumento 'squared'.
-    # Calculamos primero el MSE y luego sacamos la raíz cuadrada para obtener el RMSE.
-    mse = mean_squared_error(y_true, y_pred)
-    rmse = float(np.sqrt(mse))
-
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
     r2 = r2_score(y_true, y_pred)
 
-    return {
-        "mae": float(mae),
-        "rmse": rmse,
-        "r2": float(r2),
-    }
+    return {"mae": mae, "rmse": rmse, "r2": r2}
 
 
-def simulate_mean_shift_drift(
-    X: pd.DataFrame,
-    shift_fraction: float = 0.2,
-    numeric_columns: Optional[list] = None
-) -> pd.DataFrame:
+# ============================================================
+# DRIFT SIMULATION ON ENGINEERED FEATURES
+# ============================================================
+
+def simulate_drift(X: pd.DataFrame, shift_fraction=0.2):
+    Xd = X.copy()
+    numeric_cols = Xd.select_dtypes(include=['number']).columns
+
+    for col in numeric_cols:
+        Xd[col] += shift_fraction * Xd[col].std()
+
+    return Xd
+
+
+# ============================================================
+# BASELINE EVALUATION (NO X/Y FILES NEEDED)
+# ============================================================
+
+def evaluate_model(
+    processed_csv_path: str,
+    model_path: str,
+    log_to_mlflow=False,
+    experiment="offline_eval",
+    run="baseline"
+):
     """
-    Simula data drift aplicando un desplazamiento (shift) en las variables numéricas.
+    Full end-to-end evaluation:
 
-    Parameters
-    ----------
-    X : pd.DataFrame
-        Features originales (datos de referencia).
-    shift_fraction : float
-        Fracción de la desviación estándar que se suma a cada columna numérica.
-        Por ejemplo, 0.2 significa que se suma 0.2 * std(columna).
-    numeric_columns : list, optional
-        Lista de columnas numéricas a las que se aplicará el shift.
-        Si es None, se usan todas las columnas numéricas de X.
-
-    Returns
-    -------
-    X_drifted : pd.DataFrame
-        Copia de X con data drift simulado.
+    processed CSV → FeatureEngineering.run() → X_processed,y → predict → metrics
     """
-    X_drifted = X.copy()
 
-    if numeric_columns is None:
-        numeric_columns = X_drifted.select_dtypes(include=["number"]).columns.tolist()
+    # --------------------------------------------------------
+    # 1) LOAD CLEANED DATA
+    # --------------------------------------------------------
+    df_clean = load_clean_dataframe(processed_csv_path)
 
-    for col in numeric_columns:
-        std = X_drifted[col].std()
-        shift = shift_fraction * std
-        X_drifted[col] = X_drifted[col] + shift
+    # --------------------------------------------------------
+    # 2) REBUILD FEATURES (exactly like training)
+    # --------------------------------------------------------
+    fe = FeatureEngineer(
+        raw_processed_dir="data/processed",
+        save_dir="data/tmp"
+    )
 
-    return X_drifted
+    X_processed, y, preprocessor = fe.run(
+        filename=Path(processed_csv_path).name
+    )
 
+    # --------------------------------------------------------
+    # 3) LOAD MODEL
+    # --------------------------------------------------------
+    model = load_rulefit_model(model_path)
 
-def evaluate_current_model(
-    data_dir: str = "data/processed",
-    model_path: str = "models/rulefit.pkl",
-    log_to_mlflow: bool = True,
-    run_name: Optional[str] = "offline_evaluation"
-) -> Dict[str, float]:
-    """
-    Evalúa el modelo actual usando los datos procesados completos.
+    # --------------------------------------------------------
+    # 4) PREDICT + METRICS
+    # --------------------------------------------------------
+    y_pred = model.predict(X_processed)
+    metrics = compute_regression_metrics(y, y_pred)
 
-    Flujo:
-    - Carga X_features, y_target con load_processed_data.
-    - Carga el modelo rulefit.pkl.
-    - Calcula métricas.
-    - (Opcional) Registra métricas en MLflow.
-    """
-    # 1) Cargar datos procesados
-    X, y = load_processed_data(data_dir=data_dir)
-
-    # 2) Cargar modelo
-    model = load_model(model_path=model_path)
-
-    # 3) Predicciones
-    y_pred = model.predict(X)
-
-    # 4) Métricas
-    metrics = compute_regression_metrics(y_true=y, y_pred=y_pred)
-
-    # 5) Logging en MLflow (opcional)
+    # --------------------------------------------------------
+    # 5) OPTIONAL MLflow logging
+    # --------------------------------------------------------
     if log_to_mlflow:
-        mlflow_cfg = MLflowConfig()
-        mlflow_cfg.setup()
-
-        with mlflow.start_run(run_name=run_name):
-            mlflow.log_param("evaluation_data_dir", data_dir)
-            mlflow.log_param("evaluation_model_path", model_path)
-
-            for name, value in metrics.items():
-                mlflow.log_metric(name, value)
+        mlflow.set_experiment(experiment)
+        with mlflow.start_run(run_name=run):
+            for k, v in metrics.items():
+                mlflow.log_metric(k, v)
+            mlflow.sklearn.log_model(model, "rulefit_model")
 
     return metrics
 
 
-def evaluate_model_under_drift(
-    data_dir: str = "data/processed",
-    model_path: str = "models/rulefit.pkl",
-    shift_fraction: float = 0.2,
-    r2_drop_alert_threshold: float = 0.02,
-    log_to_mlflow: bool = True,
-    run_name: Optional[str] = "drift_evaluation_mean_shift",
-) -> Dict[str, Dict[str, float]]:
-    """
-    Evalúa el impacto de un data drift simulado sobre el desempeño del modelo.
+# ============================================================
+# DRIFT EVALUATION (NO X/Y FILES)
+# ============================================================
 
-    Flujo:
-    - Carga X_features, y_target (datos de referencia).
-    - Calcula métricas baseline.
-    - Genera un dataset de monitoreo con shift en variables numéricas.
-    - Calcula métricas con drift.
-    - Compara métricas y define si se activa una alerta.
-    """
-    # 1) Cargar datos procesados
-    X_ref, y_ref = load_processed_data(data_dir=data_dir)
+def evaluate_model_with_drift(
+    processed_csv_path: str,
+    model_path: str,
+    shift_fraction=0.25,
+    log_to_mlflow=False
+):
+    df_clean = load_clean_dataframe(processed_csv_path)
 
-    # 2) Cargar modelo
-    model = load_model(model_path=model_path)
+    fe = FeatureEngineer("data/processed", "data/tmp")
+    X_processed, y, preprocessor = fe.run(filename=Path(processed_csv_path).name)
 
-    # 3) Baseline (sin drift)
-    y_pred_ref = model.predict(X_ref)
-    baseline_metrics = compute_regression_metrics(y_true=y_ref, y_pred=y_pred_ref)
+    model = load_rulefit_model(model_path)
 
-    # 4) Generar dataset de monitoreo con drift
-    X_drifted = simulate_mean_shift_drift(X_ref, shift_fraction=shift_fraction)
-    y_pred_drift = model.predict(X_drifted)
-    drift_metrics = compute_regression_metrics(y_true=y_ref, y_pred=y_pred_drift)
+    # Base
+    y_pred_base = model.predict(X_processed)
+    base = compute_regression_metrics(y, y_pred_base)
 
-    # 5) Comparar métricas
-    r2_drop = baseline_metrics["r2"] - drift_metrics["r2"]
-    rmse_increase = drift_metrics["rmse"] - baseline_metrics["rmse"]
-    mae_increase = drift_metrics["mae"] - baseline_metrics["mae"]
+    # Drifted
+    X_drift = simulate_drift(X_processed, shift_fraction)
+    y_pred_drift = model.predict(X_drift)
+    drift = compute_regression_metrics(y, y_pred_drift)
 
-    drift_alert = r2_drop >= r2_drop_alert_threshold
+    return {"baseline": base, "drift": drift}
 
-    results = {
-        "baseline": baseline_metrics,
-        "drift": drift_metrics,
-        "delta": {
-            "r2_drop": float(r2_drop),
-            "rmse_increase": float(rmse_increase),
-            "mae_increase": float(mae_increase),
-        },
-        "alert": {
-            "drift_detected": bool(drift_alert),
-            "r2_drop_alert_threshold": float(r2_drop_alert_threshold),
-        },
-    }
 
-    # 6) Guardar dataset de monitoreo (útil para la tarea)
-    monitoring_dir = Path("data/monitoring")
-    monitoring_dir.mkdir(parents=True, exist_ok=True)
-    X_drifted.to_csv(monitoring_dir / "X_monitor_drifted.csv", index=False)
-    pd.DataFrame({"target": y_ref}).to_csv(
-        monitoring_dir / "y_monitor_drifted.csv", index=False
-    )
-
-    # 7) Logging en MLflow (opcional)
-    if log_to_mlflow:
-        mlflow_cfg = MLflowConfig()
-        mlflow_cfg.setup()
-
-        with mlflow.start_run(run_name=run_name):
-            # Parámetros del experimento de drift
-            mlflow.log_param("evaluation_data_dir", data_dir)
-            mlflow.log_param("evaluation_model_path", model_path)
-            mlflow.log_param("shift_fraction", shift_fraction)
-            mlflow.log_param("r2_drop_alert_threshold", r2_drop_alert_threshold)
-
-            # Métricas baseline
-            for name, value in baseline_metrics.items():
-                mlflow.log_metric(f"baseline_{name}", value)
-
-            # Métricas con drift
-            for name, value in drift_metrics.items():
-                mlflow.log_metric(f"drift_{name}", value)
-
-            # Deltas
-            mlflow.log_metric("r2_drop", r2_drop)
-            mlflow.log_metric("rmse_increase", rmse_increase)
-            mlflow.log_metric("mae_increase", mae_increase)
-
-            # Alerta (0 o 1)
-            mlflow.log_metric("drift_alert", 1.0 if drift_alert else 0.0)
-
-    return results
-
+# ============================================================
+# MAIN EXECUTION
+# ============================================================
 
 if __name__ == "__main__":
-    # Evaluación baseline
-    metrics = evaluate_current_model()
-    print("Evaluation metrics (baseline):")
-    for k, v in metrics.items():
-        print(f"  {k}: {v:.4f}")
 
-    # Evaluación con drift simulado
-    print("\nEvaluating model under simulated data drift...")
-    drift_results = evaluate_model_under_drift()
-    print("\nBaseline metrics:")
-    for k, v in drift_results["baseline"].items():
-        print(f"  {k}: {v:.4f}")
+    PROCESSED_PATH = "data/processed/steel_energy_processed.csv"
+    MODEL_PATH = "models/rulefit.pkl"
 
-    print("\nDrifted metrics:")
-    for k, v in drift_results["drift"].items():
-        print(f"  {k}: {v:.4f}")
+    print("📊 BASELINE EVALUATION")
+    base = evaluate_model(PROCESSED_PATH, MODEL_PATH, log_to_mlflow=False)
+    print(base)
 
-    print("\nDelta:")
-    for k, v in drift_results["delta"].items():
-        print(f"  {k}: {v:.4f}")
-
-    print("\nDrift alert:", drift_results["alert"])
+    print("\n🌪 DRIFT EVALUATION")
+    drift = evaluate_model_with_drift(PROCESSED_PATH, MODEL_PATH)
+    print(drift)
