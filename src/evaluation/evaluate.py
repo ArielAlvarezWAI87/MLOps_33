@@ -29,12 +29,17 @@ import os
 
 
 # ============================================================
+# MLFLOW CONFIGURATION
+# ============================================================
+mlflow.set_tracking_uri("file:../mlruns")
+
+
+# ============================================================
 # IMPORT PHASE 2 MODULES
 # ============================================================
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from src.features.feature_engineering import FeatureEngineer
-from src.data.preprocessing import DataPreprocessor
 
 
 # ============================================================
@@ -93,7 +98,7 @@ def evaluate_model(
     processed_csv_path: str,
     model_path: str,
     log_to_mlflow=False,
-    experiment="offline_eval",
+    experiment="baseline_evaluation",
     run="baseline"
 ):
     """
@@ -163,7 +168,7 @@ def evaluate_model_with_drift(
     model_path: str,
     shift_fraction=0.25,
     log_to_mlflow=False,
-    experiment="offline_eval",
+    experiment="drift_eval",
     run="drift_eval"
 ):
     """
@@ -241,13 +246,14 @@ if __name__ == "__main__":
 
     PROCESSED_PATH = "data/processed/steel_energy_processed.csv"
     MODEL_PATH = "models/rulefit.pkl"
+    experiment = "baseline_drift_evaluation"
 
     print("📊 BASELINE EVALUATION")
-    base = evaluate_model(PROCESSED_PATH, MODEL_PATH, log_to_mlflow=False)
+    base = evaluate_model(PROCESSED_PATH, MODEL_PATH, log_to_mlflow=True,experiment=experiment)
     
 
     print("\n🌪 DRIFT EVALUATION")
-    drift = evaluate_model_with_drift(PROCESSED_PATH, MODEL_PATH,log_to_mlflow=False)
+    drift = evaluate_model_with_drift(PROCESSED_PATH, MODEL_PATH, log_to_mlflow=True,experiment=experiment)
     
     print("\n--- RESULTS ---")
     print("BASELINE METRICS:", base)
