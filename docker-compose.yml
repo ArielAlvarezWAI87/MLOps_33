@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # Training pipeline
+  train:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: steel-energy-mlops:latest
+    container_name: steel-energy-train
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./mlruns:/app/mlruns
+    environment:
+      - PYTHONHASHSEED=42
+    command: >
+      sh -c "
+        echo 'Running full training pipeline...' &&
+        python src/data/preprocessing.py &&
+        python src/features/feature_engineering.py &&
+        python src/models/rulefit_trainer.py &&
+        echo 'Training completed successfully!'
+      "
+
+  # API service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: steel-energy-mlops:latest
+    container_name: steel-energy-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - PYTHONHASHSEED=42
+    command: uvicorn src.deployment.api:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Run tests
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: steel-energy-mlops:latest
+    container_name: steel-energy-test
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - PYTHONHASHSEED=42
+    command: pytest tests/ -v --cov=src --cov-report=term-missing
+
+  # Reproducibility verification
+  verify-reproducibility:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: steel-energy-mlops:latest
+    container_name: steel-energy-verify
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PYTHONHASHSEED=42
+    command: >
+      sh -c "
+        echo 'Reproducibility Test - Run 1' &&
+        python src/data/preprocessing.py &&
+        python src/features/feature_engineering.py &&
+        cp data/processed/X_features.csv data/processed/X_features_run1.csv &&
+        cp data/processed/y_target.csv data/processed/y_target_run1.csv &&
+        echo '' &&
+        echo 'Reproducibility Test - Run 2' &&
+        python src/data/preprocessing.py &&
+        python src/features/feature_engineering.py &&
+        cp data/processed/X_features.csv data/processed/X_features_run2.csv &&
+        cp data/processed/y_target.csv data/processed/y_target_run2.csv &&
+        echo '' &&
+        echo 'Comparing outputs...' &&
+        python scripts/compare_outputs.py
+      "

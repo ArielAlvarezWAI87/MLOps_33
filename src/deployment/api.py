@@ -129,7 +129,14 @@ async def root():
     return {
         "name": "Steel Energy Prediction API",
         "version": MODEL_VERSION,
-        "model": MODEL_NAME
+        "model": MODEL_NAME,
+        "endpoints": {
+            "health": "/health",
+            "model_info": "/model/info",
+            "predict": "/predict",
+            "docs": "/docs",
+            "redoc": "/redoc"
+        }
     }
 
 

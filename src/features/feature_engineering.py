@@ -14,9 +14,17 @@ Outputs:
     ../data/processed/feature_info.pkl
 """
 
+import sys
+from pathlib import Path
+
+# Add project root to path (allows running script directly)
+if __name__ == "__main__":
+    project_root = Path(__file__).resolve().parents[2]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+
 import pandas as pd
 import numpy as np
-from pathlib import Path
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import (
@@ -29,6 +37,9 @@ from sklearn.impute import SimpleImputer
 import joblib
 import warnings
 warnings.filterwarnings("ignore")
+
+# Import reproducibility utilities
+from src.utils.reproducibility import set_seeds, RANDOM_SEED
 
 
 class FeatureEngineer:
@@ -203,6 +214,9 @@ class FeatureEngineer:
     # ----------------------------------------------------------------------
     def run(self, filename: str = "steel_energy_processed.csv"):
         """Full feature engineering pipeline: load, transform, and save."""
+        # Set random seeds for reproducibility
+        set_seeds(RANDOM_SEED)
+
         df = self.load_clean_data(filename)
         df_eng = self.engineer_features(df)
 

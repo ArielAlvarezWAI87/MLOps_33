@@ -1,34 +1,25 @@
-# MLOps Project
+# MLOps Project - Steel Energy Prediction
 
-## Quick Start (New Team Members)
+Machine learning project for predicting energy consumption in steel manufacturing with complete MLOps implementation.
 
-### One-Command Setup
+## Quick Start
+
+### Setup (New Team Members)
+
 ```bash
-# 1. Clone the repository
+# Clone and setup
 git clone <your-repo-url>
 cd <repo-name>
-
-# 2. Run the setup script
 ./scripts/setup.sh
 ```
 
-That's it! The script will:
-- Create `.env` from template (you'll need to add credentials)
+The script will:
+- Create `.env` from template (add your AWS credentials)
 - Create virtual environment
-- Install all dependencies
-- Initialize and configure DVC
-- Pull data from S3
+- Install dependencies
+- Configure DVC and pull data from S3
 
-**First time running?** The script will create `.env` and exit. Edit it with your credentials, then run `./scripts/setup.sh` again.
-
-### What You Need
-
-**AWS Credentials** (get these from your team lead):
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- Optionally: `AWS_PROFILE` if using AWS CLI profiles
-
-**Add them to `.env`:**
+**Required AWS Credentials** (add to `.env`):
 ```bash
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=abc123...
@@ -40,174 +31,64 @@ DVC_S3_BUCKET=itesm-mna
 DVC_S3_PATH=202502-equipo0
 ```
 
-## Daily Workflow
-```bash
-# Activate environment and load credentials
-source .venv/bin/activate
-source scripts/load_env.sh
+### Daily Workflow
 
-# Pull latest data
+```bash
+# Activate and pull latest 
+source .venv/bin/activate #MAC/LINUX
+source .venv/Scripts/activate #WINDOWS
+source scripts/load_env.sh
 dvc pull
 
-# Do your work
-python src/train.py
-
-# Push any data/model changes
+# Work and push changes
 dvc add data/processed models/
 dvc push
-
-# Commit and push code changes
-git add .
-git commit -m "Update model"
-git push
+git add . && git commit -m "Update model" && git push
 ```
 
 ## Model Serving API
 
-### Starting the API Server
+### Start API
 
-**Quick start:**
 ```bash
 ./scripts/start_api.sh
+# Or manually: uvicorn src.deployment.api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**Manual start:**
-```bash
-# Activate environment
-source .venv/bin/activate
-
-# Start API server
-uvicorn src.deployment.api:app --host 0.0.0.0 --port 8000 --reload
-```
-
-The API will be available at `http://localhost:8000`
-
-**Interactive Documentation:**
-- Swagger UI: http://localhost:8000/docs
+**Access:**
+- API: http://localhost:8000
+- Swagger Docs: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
 ### Model Information
 
-**Current Model:**
-- **Name**: `rulefit_steel_energy`
-- **Version**: `1.0.0`
-- **Type**: RuleFitRegressor
-- **Model Path**: `models/rulefit.pkl`
-- **Preprocessor Path**: `data/processed/preprocessor.pkl`
-
-**Model Registry (MLflow):**
-```
-models:/rulefit_steel_energy/1.0.0
-```
+- **Model**: RuleFitRegressor (`rulefit_steel_energy` v1.0.0)
+- **Registry**: `models:/rulefit_steel_energy/1.0.0`
+- **Files**: `models/rulefit.pkl`, `data/processed/preprocessor.pkl`
 
 ### API Endpoints
 
-#### 1. **GET /** - API Information
-Get basic information about the API.
-
+#### GET / - API Information
 ```bash
 curl http://localhost:8000/
 ```
 
-#### 2. **GET /health** - Health Check
-Check if the API and model are ready.
-
+#### GET /health - Health Check
 ```bash
 curl http://localhost:8000/health
+# {"status": "healthy", "model_loaded": true, "preprocessor_loaded": true}
 ```
 
-**Response:**
-```json
-{
-  "status": "healthy",
-  "model_loaded": true,
-  "preprocessor_loaded": true,
-  "timestamp": "2025-01-15T10:30:00"
-}
-```
-
-#### 3. **GET /model/info** - Model Metadata
-Get information about the loaded model.
-
+#### GET /model/info - Model Metadata
 ```bash
 curl http://localhost:8000/model/info
+# {"model_name": "rulefit_steel_energy", "model_version": "1.0.0", ...}
 ```
 
-**Response:**
-```json
-{
-  "model_name": "rulefit_steel_energy",
-  "model_version": "1.0.0",
-  "model_path": "models/rulefit.pkl",
-  "preprocessor_path": "data/processed/preprocessor.pkl",
-  "model_type": "RuleFitRegressor"
-}
-```
+#### POST /predict - Make Predictions
 
-#### 4. **POST /predict** - Make Predictions
-Predict energy consumption for steel manufacturing.
-
-**Request Schema:**
-```json
-{
-  "data": [
-    {
-      "date": "2018-01-15 14:30:00",
-      "Lagging_Current_Reactive_Power_kVarh": 45.2,
-      "Leading_Current_Reactive_Power_kVarh": 12.5,
-      "CO2(tCO2)": 0.008,
-      "Lagging_Current_Power_Factor": 0.85,
-      "Leading_Current_Power_Factor": 0.78,
-      "NSM": 5000,
-      "WeekStatus": "Weekday",
-      "Day_of_week": "Monday",
-      "Load_Type": "Medium_Load"
-    }
-  ]
-}
-```
-
-**Field Validations:**
-- `Lagging_Current_Reactive_Power_kVarh`: 0 ≤ value ≤ 100
-- `Leading_Current_Reactive_Power_kVarh`: 0 ≤ value ≤ 30
-- `CO2(tCO2)`: 0 ≤ value ≤ 0.02
-- `Lagging_Current_Power_Factor`: 0 ≤ value ≤ 1
-- `Leading_Current_Power_Factor`: 0 ≤ value ≤ 1
-- `NSM`: 0 ≤ value ≤ 90000
-- `WeekStatus`: Must be "Weekday" or "Weekend"
-- `Day_of_week`: Must be valid day name
-- `Load_Type`: Must be "Light_Load", "Medium_Load", or "Maximum_Load"
-
-**Example Request:**
+**Request:**
 ```bash
-curl -X POST http://localhost:8000/predict \
-  -H "Content-Type: application/json" \
-  -d @examples/api_request_example.json
-```
-
-**Response:**
-```json
-{
-  "predictions": [75.3, 82.1],
-  "model_version": "1.0.0",
-  "prediction_timestamp": "2025-01-15T10:30:00",
-  "n_predictions": 2
-}
-```
-
-### Testing the API
-
-**Automated test script:**
-```bash
-./examples/test_api.sh
-```
-
-**Manual testing with curl:**
-```bash
-# Health check
-curl http://localhost:8000/health
-
-# Single prediction
 curl -X POST http://localhost:8000/predict \
   -H "Content-Type: application/json" \
   -d '{
@@ -226,219 +107,326 @@ curl -X POST http://localhost:8000/predict \
   }'
 ```
 
-**Using Python:**
-```python
-import requests
-
-# Make prediction
-response = requests.post(
-    "http://localhost:8000/predict",
-    json={
-        "data": [{
-            "date": "2018-01-15 14:30:00",
-            "Lagging_Current_Reactive_Power_kVarh": 45.2,
-            "Leading_Current_Reactive_Power_kVarh": 12.5,
-            "CO2(tCO2)": 0.008,
-            "Lagging_Current_Power_Factor": 0.85,
-            "Leading_Current_Power_Factor": 0.78,
-            "NSM": 5000,
-            "WeekStatus": "Weekday",
-            "Day_of_week": "Monday",
-            "Load_Type": "Medium_Load"
-        }]
-    }
-)
-
-result = response.json()
-print(f"Predicted energy: {result['predictions'][0]} kWh")
-```
-
-### Error Handling
-
-The API provides detailed error messages for:
-- **400 Bad Request**: Invalid input data, validation errors
-- **422 Unprocessable Entity**: Pydantic validation failures
-- **500 Internal Server Error**: Model prediction errors
-- **503 Service Unavailable**: Model not loaded
-
-**Example Error Response:**
+**Response:**
 ```json
 {
-  "error": "Invalid input data: WeekStatus must be one of ['Weekday', 'Weekend']",
-  "detail": "ValidationError...",
-  "timestamp": "2025-01-15T10:30:00"
+  "predictions": [75.3],
+  "model_version": "1.0.0",
+  "prediction_timestamp": "2025-01-15T10:30:00",
+  "n_predictions": 1
 }
 ```
 
-### Deployment Considerations
+**Validation Rules:**
+- `Lagging_Current_Reactive_Power_kVarh`: 0-100
+- `Leading_Current_Reactive_Power_kVarh`: 0-30
+- `CO2(tCO2)`: 0-0.02
+- Power Factors: 0-1
+- `NSM`: 0-90000
+- `WeekStatus`: "Weekday" or "Weekend"
+- `Load_Type`: "Light_Load", "Medium_Load", or "Maximum_Load"
 
-**Production deployment:**
-- Use `gunicorn` or multiple `uvicorn` workers for production
-- Set up HTTPS/TLS certificates
-- Implement rate limiting
-- Add authentication/authorization
-- Use containerization (Docker)
-- Set up monitoring and logging
+### Testing API
 
-**Example production command:**
 ```bash
-gunicorn src.deployment.api:app \
-  --workers 4 \
-  --worker-class uvicorn.workers.UvicornWorker \
-  --bind 0.0.0.0:8000
+# Quick test
+./examples/test_api.sh
+
+# Or manually
+curl http://localhost:8000/health
+curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d @examples/api_request_example.json
 ```
 
 ## Testing
 
-### Running Tests
+### Run Tests
 
-**Quick command (as specified):**
 ```bash
+# Quick test
 pytest -q
-```
 
-**Other useful commands:**
-```bash
-# Run all tests with verbose output
-pytest tests/ -v
+# Verbose with coverage
+pytest tests/ -v --cov=src --cov-report=term-missing
 
-# Run only unit tests
-pytest tests/unit/
-
-# Run only integration tests
-pytest tests/integration/
-
-# Run with coverage report
-pytest tests/ --cov=src --cov-report=term-missing
-
-# Generate HTML coverage report
-pytest tests/ --cov=src --cov-report=html
-# Then open htmlcov/index.html in your browser
-
-# Run specific test file
-pytest tests/unit/test_data.py
-
-# Run tests matching a pattern
-pytest tests/ -k "preprocessing"
+# Specific test types
+pytest tests/unit/        # Unit tests only
+pytest tests/integration/ # Integration tests only
 ```
 
 ### Test Coverage
 
-Current coverage: **62%**
+**Current: 69% coverage, 30 tests passing**
+
 - `src/data/load_data.py`: 100%
 - `src/data/preprocessing.py`: 91%
 - `src/features/feature_engineering.py`: 95%
 - `src/models/rulefit_trainer.py`: 88%
 
-### Test Structure
-
+**Structure:**
 ```
 tests/
-├── conftest.py              # Shared fixtures and utilities
-├── unit/                    # Unit tests (17 tests)
-│   ├── test_data.py        # Data loading & preprocessing (11 tests)
-│   ├── test_features.py    # Feature engineering (3 tests)
-│   └── test_model.py       # Model training & prediction (5 tests)
-└── integration/             # Integration tests (2 tests)
-    └── test_pipeline.py    # End-to-end pipeline validation
+├── conftest.py           # Shared fixtures
+├── unit/                 # 26 tests
+│   ├── test_data.py     # Data loading & preprocessing
+│   ├── test_features.py # Feature engineering
+│   └── test_model.py    # Model training & prediction
+└── integration/          # 4 tests
+    ├── test_pipeline.py # End-to-end pipeline
+    └── test_api.py      # API integration tests
 ```
 
-### What is Tested
+## Reproducibility & Docker
 
-**Unit Tests:**
-- ✅ Data loading and validation
-- ✅ Data preprocessing and cleaning
-- ✅ Data quality rules (power factor, CO2, NSM limits)
-- ✅ Missing value handling
-- ✅ Feature engineering (temporal, cyclical, power features)
-- ✅ Model training with RuleFit
-- ✅ Model serialization/deserialization
-- ✅ Prediction workflows
+### Quick Reproducibility Check
 
-**Integration Tests:**
-- ✅ End-to-end pipeline: data → preprocessing → features → model
-- ✅ Data flow consistency across pipeline stages
+```bash
+# Local test
+pytest tests/ -v
 
-### Adding New Tests
-
-1. **For unit tests**, add to appropriate file in `tests/unit/`:
-```python
-@pytest.mark.unit
-def test_my_new_feature(sample_data):
-    # Your test here
-    assert result == expected
+# Docker test (clean environment)
+docker-compose run --rm verify-reproducibility
 ```
 
-2. **For integration tests**, add to `tests/integration/test_pipeline.py`:
-```python
-@pytest.mark.integration
-def test_new_pipeline_flow(temp_data_dir, sample_raw_data):
-    # Your test here
-    assert pipeline_works
+### What Makes It Reproducible
+
+1. **Fixed Dependencies**
+   - Python 3.11.3 (`.python-version`)
+   - Pinned: `requirements.txt` (17 packages)
+   - Complete freeze: `requirements-lock.txt` (178 packages)
+
+2. **Random Seed Management**
+   - Global seed: `RANDOM_SEED = 42`
+   - Centralized in `src/utils/reproducibility.py`
+   - Applied to: NumPy, scikit-learn, RuleFit, train-test splits
+
+3. **Version Control**
+   - DVC for data/models (S3: `s3://itesm-mna/202502-equipo0`)
+   - MLflow for experiment tracking
+   - Docker for environment isolation
+
+### Docker Usage
+
+**Build and run:**
+```bash
+# Build
+docker build -t ml-service:latest .
+
+# Run API
+docker run -p 8000:8000 ml-service:latest
+
+# Run in background
+docker run -d -p 8000:8000 --name ml-service ml-service:latest
+
+# View logs
+docker logs -f ml-service
 ```
 
-3. **Use fixtures** from `tests/conftest.py`:
-- `sample_raw_data` - Mock raw dataset
-- `sample_processed_data` - Mock processed dataset
-- `temp_data_dir` - Temporary directories for testing
-- `mock_mlflow_run` - Mock MLflow tracking
+**Docker Compose:**
+```bash
+# Run tests
+docker-compose run --rm test
+
+# Verify reproducibility
+docker-compose run --rm verify-reproducibility
+
+# Run training pipeline
+docker-compose run --rm train
+
+# Start API service
+docker-compose up api
+```
+
+**Publish to DockerHub:**
+```bash
+export DOCKERHUB_USERNAME=your-username
+./scripts/docker_publish.sh
+```
+
+Tags: `latest`, `1.0.0`, `1.0`, `1`
+
+**Image Details:**
+- Base: `python:3.11.3-slim`
+- Size: ~1.94GB
+- Port: 8000
+- Health check: `/health` endpoint (every 30s)
+
+### Cross-Machine Verification
+
+**Machine A:**
+```bash
+python src/data/preprocessing.py
+python src/features/feature_engineering.py
+python src/models/rulefit_trainer.py
+dvc push && git push
+```
+
+**Machine B:**
+```bash
+git pull && dvc pull
+python src/data/preprocessing.py
+python src/features/feature_engineering.py
+python src/models/rulefit_trainer.py
+# Results identical to Machine A
+```
+
+## Data Drift Monitoring
+
+### Quick Start
+
+```bash
+# 1. Generate drift scenarios
+python src/monitoring/drift_simulator.py
+
+# 2. Run monitoring
+python src/monitoring/run_drift_monitoring.py
+
+# 3. View results
+./scripts/view_drift_report.sh
+```
+
+### Drift Scenarios
+
+| Scenario | Description | Simulates |
+|----------|-------------|-----------|
+| **Mean Shift** | 20% change in feature means | Calibration drift |
+| **Missing Features** | 30% missing values | Sensor failures |
+| **Seasonal Change** | 1.3× energy multiplier | Winter production |
+| **Combined Drift** | Multiple drift types | Realistic scenario |
+
+### Alert Thresholds
+
+| Metric | Threshold | Meaning |
+|--------|-----------|---------|
+| **KS Statistic** | > 0.1 | Feature distribution changed |
+| **PSI** | > 0.2 | Significant population shift |
+| **R² Drop** | > 10% | Model performance degraded |
+| **MAE/RMSE Increase** | > 15% | Prediction error increased |
+| **Missing Data** | > 5% | Data quality issues |
+
+### Example Results
+
+```
+Scenario: Combined Drift
+Status: ALERT
+Performance: R²=0.8961 (baseline: 0.9556) ↓6.2%
+            MAE=7.8240 (baseline: 4.2230) ↑85.2%
+            RMSE=10.7821 (baseline: 7.0438) ↑53.1%
+Drift: 5/7 features affected
+
+Recommended Actions:
+- HIGH: REVIEW_FEATURE_PIPELINE (MAE degraded 85%)
+- HIGH: INVESTIGATE_DATA_QUALITY (RMSE degraded 53%)
+```
+
+### Monitoring Reports
+
+Reports saved to `data/monitoring/reports/`:
+- `summary.json` - Overall summary
+- `report_drift_*.json` - Per-scenario details
+
+**Production Integration:**
+```bash
+# Cron job for continuous monitoring
+0 0 * * * /path/to/run_drift_monitoring.py
+
+# Check for alerts
+STATUS=$(cat data/monitoring/reports/summary.json | python -c "import json, sys; print(json.load(sys.stdin)['summary']['scenarios_with_alerts'])")
+if [ "$STATUS" -gt "0" ]; then
+    echo "⚠️ DRIFT ALERT: $STATUS scenarios need attention"
+    # Send notification
+fi
+```
 
 ## Project Structure
+
 ```
 .
 ├── data/
 │   ├── raw/              # Original data (DVC tracked)
-│   └── processed/        # Processed data (DVC tracked)
+│   ├── processed/        # Processed data (DVC tracked)
+│   └── monitoring/       # Drift reports (gitignored)
 ├── models/               # Trained models (DVC tracked)
-├── src/                  # Source code
+├── src/
 │   ├── data/            # Data loading and preprocessing
 │   ├── features/        # Feature engineering
-│   ├── models/          # Model training and prediction
+│   ├── models/          # Model training
 │   ├── evaluation/      # Model evaluation
-│   └── deployment/      # API and deployment
-├── tests/                # Test suite (19 tests, 62% coverage)
-│   ├── conftest.py      # Shared test fixtures
-│   ├── unit/            # Unit tests
-│   └── integration/     # Integration tests
+│   ├── deployment/      # FastAPI service
+│   ├── monitoring/      # Drift detection
+│   └── utils/           # Reproducibility utilities
+├── tests/                # 30 tests, 69% coverage
+│   ├── unit/            # 26 unit tests
+│   └── integration/     # 4 integration tests
 ├── scripts/
-│   ├── setup.sh         # One-command setup
-│   ├── load_env.sh      # Load environment variables
-│   └── start_api.sh     # Start FastAPI server
-├── examples/             # Example files for API testing
-│   ├── api_request_example.json  # Sample API request
-│   └── test_api.sh      # API testing script
-├── pytest.ini           # Pytest configuration
-├── .env.example         # Template for credentials
-├── .env                 # Your credentials (not committed)
-├── requirements.txt     # Python dependencies
-└── README.md
+│   ├── setup.sh              # One-command setup
+│   ├── load_env.sh           # Load environment variables
+│   ├── start_api.sh          # Start FastAPI server
+│   ├── docker_publish.sh     # Publish to DockerHub
+│   ├── view_drift_report.sh  # View drift monitoring results
+│   └── compare_outputs.py    # Compare pipeline outputs (for Docker reproducibility test)
+├── examples/             # API testing examples
+├── Dockerfile           # Container definition
+├── docker-compose.yml   # Multi-service orchestration
+├── pytest.ini           # Test configuration
+├── requirements.txt     # Main dependencies (pinned)
+├── requirements-lock.txt # Complete freeze
+└── .python-version      # Python 3.11.3
 ```
 
 ## Troubleshooting
 
-### "Access Denied" when running dvc pull
-- Verify your AWS credentials in `.env`
-- Ask your team lead to grant you S3 bucket access
-- Test with: `aws s3 ls s3://itesm-mna/202502-equipo0 --profile equipo0`
+### DVC Issues
 
-### "No remote configured"
-- Run: `./scripts/setup.sh` again
-- This will reconfigure the DVC remote
-
-### Need to reset everything?
+**"Access Denied" on dvc pull:**
 ```bash
-# Remove virtual environment and DVC
-rm -rf .venv .dvc
+# Verify credentials
+cat .env
+aws s3 ls s3://itesm-mna/202502-equipo0 --profile equipo0
+```
 
-# Run setup again
+**"No remote configured":**
+```bash
+./scripts/setup.sh  # Reconfigure DVC
+```
+
+### Environment Issues
+
+**Reset everything:**
+```bash
+rm -rf .venv .dvc
 ./scripts/setup.sh
 ```
 
-## Model Evaluation and Data Drift Monitoring
-
-### Offline model evaluation
-
-Once the project is set up (`./scripts/setup.sh`, environment activated and `dvc pull` completed), you can run an offline evaluation of the current model:
-
+**Import errors when running scripts directly:**
 ```bash
-python -m src.evaluation.evaluate
+# Use these commands from project root
+python src/data/preprocessing.py
+python src/features/feature_engineering.py
+python src/models/rulefit_trainer.py
+```
+
+### Docker Issues
+
+**Container won't start:**
+```bash
+docker logs ml-service  # Check logs
+docker ps -a           # Check status
+```
+
+**Port already in use:**
+```bash
+# Use different port
+docker run -p 9000:8000 ml-service:latest
+```
+
+## MLOps Features Summary
+
+✅ **Testing**: 30 unit & integration tests, 69% coverage
+✅ **API Serving**: FastAPI with Pydantic validation, OpenAPI docs
+✅ **Reproducibility**: Fixed deps, random seeds, Docker, DVC
+✅ **Containerization**: Docker images with semantic versioning
+✅ **Drift Monitoring**: Automated detection with alerts & recommended actions
+
+---
+
+**Model**: RuleFitRegressor | **Framework**: scikit-learn, MLflow | **Deployment**: FastAPI, Docker
