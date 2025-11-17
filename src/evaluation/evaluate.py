@@ -169,7 +169,7 @@ def evaluate_model_with_drift(
     y_pred_drift = model.predict(X_drift)
     drift = compute_regression_metrics(y, y_pred_drift)
 
-    return {"baseline": base, "drift": drift}
+    return {"drift": drift}
 
 
 # ============================================================
@@ -183,8 +183,11 @@ if __name__ == "__main__":
 
     print("📊 BASELINE EVALUATION")
     base = evaluate_model(PROCESSED_PATH, MODEL_PATH, log_to_mlflow=False)
-    print(base)
+    
 
     print("\n🌪 DRIFT EVALUATION")
     drift = evaluate_model_with_drift(PROCESSED_PATH, MODEL_PATH)
-    print(drift)
+    
+    print("\n--- RESULTS ---")
+    print("BASELINE METRICS:", base)
+    print("DRIFT METRICS:", drift)
