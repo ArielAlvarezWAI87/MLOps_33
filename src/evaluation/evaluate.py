@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 import joblib
 import mlflow
+import mlflow.sklearn
 import sys
 import os
 
@@ -31,7 +32,9 @@ import os
 # ============================================================
 # MLFLOW CONFIGURATION
 # ============================================================
-mlflow.set_tracking_uri("file:../mlruns")
+ROOT_DIR = Path(__file__).resolve().parents[2]
+MLRUN_DIR = ROOT_DIR / "mlruns"
+mlflow.set_tracking_uri(MLRUN_DIR.as_uri())
 
 
 # ============================================================
@@ -142,16 +145,24 @@ def evaluate_model(
         with mlflow.start_run(run_name=run):
 
             # Parameters
-            mlflow.log_param("processed_csv", processed_csv_path)
-            mlflow.log_param("model_path", model_path)
+            params = {
+                "processed_csv": processed_csv_path,
+                "model_path": model_path,
+                "evaluation_type": "baseline"
+            }
+            mlflow.log_params(params)
 
             # Metrics
-            for k, v in metrics.items():
-                mlflow.log_metric(f"baseline_{k}", v)
+            mlflow.log_metrics({
+                "baseline_mae": metrics["mae"],
+                "baseline_rmse": metrics["rmse"],
+                "baseline_r2": metrics["r2"]
+            })
 
-            # Artifacts
-            mlflow.log_artifact(model_path, artifact_path="model")
+            # Log model using mlflow.sklearn
+            mlflow.sklearn.log_model(model, "model")
 
+            # Log preprocessor as artifact
             preprocessor_path = "data/tmp/preprocessor.pkl"
             joblib.dump(preprocessor, preprocessor_path)
             mlflow.log_artifact(preprocessor_path, artifact_path="preprocessor")
@@ -168,7 +179,7 @@ def evaluate_model_with_drift(
     model_path: str,
     shift_fraction=0.25,
     log_to_mlflow=False,
-    experiment="drift_eval",
+    experiment="drift_evaluation",
     run="drift_eval"
 ):
     """
@@ -197,11 +208,6 @@ def evaluate_model_with_drift(
     # --------------------------------------------------------
     model = load_rulefit_model(model_path)
 
-    # --------------------------------------------------------
-    # 4) BASELINE METRICS
-    # --------------------------------------------------------
-    y_pred_base = model.predict(X_processed)
-    baseline_metrics = compute_regression_metrics(y, y_pred_base)
 
     # --------------------------------------------------------
     # 5) DRIFTED METRICS
@@ -218,25 +224,30 @@ def evaluate_model_with_drift(
         with mlflow.start_run(run_name=run):
 
             # Parameters
-            mlflow.log_param("processed_csv", processed_csv_path)
-            mlflow.log_param("model_path", model_path)
-            mlflow.log_param("shift_fraction", shift_fraction)
+            params = {
+                "processed_csv": processed_csv_path,
+                "model_path": model_path,
+                "shift_fraction": shift_fraction,
+                "evaluation_type": "drift"
+            }
+            mlflow.log_params(params)
 
-            # Metrics
-            for k, v in baseline_metrics.items():
-                mlflow.log_metric(f"baseline_{k}", v)
+            # Metrics - both baseline and drift
+            mlflow.log_metrics({
+                "drift_mae": drift_metrics["mae"],
+                "drift_rmse": drift_metrics["rmse"],
+                "drift_r2": drift_metrics["r2"]
+            })
 
-            for k, v in drift_metrics.items():
-                mlflow.log_metric(f"drift_{k}", v)
+            # Log model using mlflow.sklearn
+            mlflow.sklearn.log_model(model, "model")
 
-            # Artifacts
-            mlflow.log_artifact(model_path, artifact_path="model")
-
+            # Log preprocessor as artifact
             preprocessor_path = "data/tmp/preprocessor.pkl"
             joblib.dump(preprocessor, preprocessor_path)
             mlflow.log_artifact(preprocessor_path, artifact_path="preprocessor")
 
-    return {"drift": drift_metrics}
+    return drift_metrics
 
 # ============================================================
 # MAIN EXECUTION
@@ -246,15 +257,44 @@ if __name__ == "__main__":
 
     PROCESSED_PATH = "data/processed/steel_energy_processed.csv"
     MODEL_PATH = "models/rulefit.pkl"
-    experiment = "baseline_drift_evaluation"
 
-    print("📊 BASELINE EVALUATION")
-    base = evaluate_model(PROCESSED_PATH, MODEL_PATH, log_to_mlflow=True,experiment=experiment)
-    
+    print("="*80)
+    print("MODEL EVALUATION PIPELINE")
+    print("="*80)
+    print(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
+
+    print("\n📊 BASELINE EVALUATION")
+    print("-"*80)
+    base = evaluate_model(
+        PROCESSED_PATH, 
+        MODEL_PATH, 
+        log_to_mlflow=True,
+        experiment="model_evaluation",
+        run="baseline_eval"
+    )
+    print(f"✓ Baseline metrics computed")
+    print(f"  MAE:  {base['mae']:.4f} kWh")
+    print(f"  RMSE: {base['rmse']:.4f} kWh")
+    print(f"  R²:   {base['r2']:.4f}")
 
     print("\n🌪 DRIFT EVALUATION")
-    drift = evaluate_model_with_drift(PROCESSED_PATH, MODEL_PATH, log_to_mlflow=True,experiment=experiment)
-    
-    print("\n--- RESULTS ---")
-    print("BASELINE METRICS:", base)
-    print("DRIFT METRICS:", drift)
+    print("-"*80)
+    drift_results = evaluate_model_with_drift(
+        PROCESSED_PATH, 
+        MODEL_PATH, 
+        log_to_mlflow=True,
+        experiment="model_evaluation",
+        run="drift_eval"
+    )
+    print(f"✓ Drift metrics computed")
+    print(f"  Baseline - RMSE: {base['rmse']:.4f} kWh")
+    print(f"  Drifted  - RMSE: {drift_results['rmse']:.4f} kWh")
+    print(f"  Degradation: {((drift_results['rmse'] - base['rmse']) / base['rmse'] * 100):.2f}%")
+
+    print("\n" + "="*80)
+    print("MLFLOW UI")
+    print("="*80)
+    print("To view evaluation results in MLflow UI:")
+    print("👉 Run: mlflow ui --backend-store-uri file:../mlruns")
+    print("👉 Open: http://localhost:5000")
+    print("="*80)
