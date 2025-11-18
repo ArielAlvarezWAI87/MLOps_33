@@ -269,72 +269,39 @@ python src/models/rulefit_trainer.py
 # Results identical to Machine A
 ```
 
-## Data Drift Monitoring
+## Model Evaluation
 
-### Quick Start
+Evaluate model performance with baseline and drift simulation:
 
 ```bash
-# 1. Generate drift scenarios
-python src/monitoring/drift_simulator.py
-
-# 2. Run monitoring
-python src/monitoring/run_drift_monitoring.py
-
-# 3. View results
-./scripts/view_drift_report.sh
+python src/evaluation/evaluate.py
 ```
 
-### Drift Scenarios
+This will:
+- Run baseline evaluation on processed data
+- Simulate data drift (25% feature shift)
+- Compare performance metrics
+- Log results to MLflow
 
-| Scenario | Description | Simulates |
-|----------|-------------|-----------|
-| **Mean Shift** | 20% change in feature means | Calibration drift |
-| **Missing Features** | 30% missing values | Sensor failures |
-| **Seasonal Change** | 1.3× energy multiplier | Winter production |
-| **Combined Drift** | Multiple drift types | Realistic scenario |
-
-### Alert Thresholds
-
-| Metric | Threshold | Meaning |
-|--------|-----------|---------|
-| **KS Statistic** | > 0.1 | Feature distribution changed |
-| **PSI** | > 0.2 | Significant population shift |
-| **R² Drop** | > 10% | Model performance degraded |
-| **MAE/RMSE Increase** | > 15% | Prediction error increased |
-| **Missing Data** | > 5% | Data quality issues |
-
-### Example Results
-
-```
-Scenario: Combined Drift
-Status: ALERT
-Performance: R²=0.8961 (baseline: 0.9556) ↓6.2%
-            MAE=7.8240 (baseline: 4.2230) ↑85.2%
-            RMSE=10.7821 (baseline: 7.0438) ↑53.1%
-Drift: 5/7 features affected
-
-Recommended Actions:
-- HIGH: REVIEW_FEATURE_PIPELINE (MAE degraded 85%)
-- HIGH: INVESTIGATE_DATA_QUALITY (RMSE degraded 53%)
-```
-
-### Monitoring Reports
-
-Reports saved to `data/monitoring/reports/`:
-- `summary.json` - Overall summary
-- `report_drift_*.json` - Per-scenario details
-
-**Production Integration:**
+**View results in MLflow UI:**
 ```bash
-# Cron job for continuous monitoring
-0 0 * * * /path/to/run_drift_monitoring.py
+mlflow ui --backend-store-uri file:./mlruns
+# Open: http://localhost:5000
+```
 
-# Check for alerts
-STATUS=$(cat data/monitoring/reports/summary.json | python -c "import json, sys; print(json.load(sys.stdin)['summary']['scenarios_with_alerts'])")
-if [ "$STATUS" -gt "0" ]; then
-    echo "⚠️ DRIFT ALERT: $STATUS scenarios need attention"
-    # Send notification
-fi
+**Example output:**
+```
+📊 BASELINE EVALUATION
+✓ Baseline metrics computed
+  MAE:  4.2230 kWh
+  RMSE: 7.0438 kWh
+  R²:   0.9556
+
+🌪 DRIFT EVALUATION
+✓ Drift metrics computed
+  Baseline - RMSE: 7.0438 kWh
+  Drifted  - RMSE: 10.4366 kWh
+  Degradation: 48.17%
 ```
 
 ## Project Structure
@@ -343,16 +310,14 @@ fi
 .
 ├── data/
 │   ├── raw/              # Original data (DVC tracked)
-│   ├── processed/        # Processed data (DVC tracked)
-│   └── monitoring/       # Drift reports (gitignored)
+│   └── processed/        # Processed data (DVC tracked)
 ├── models/               # Trained models (DVC tracked)
 ├── src/
 │   ├── data/            # Data loading and preprocessing
 │   ├── features/        # Feature engineering
 │   ├── models/          # Model training
-│   ├── evaluation/      # Model evaluation
+│   ├── evaluation/      # Model evaluation and drift simulation
 │   ├── deployment/      # FastAPI service
-│   ├── monitoring/      # Drift detection
 │   └── utils/           # Reproducibility utilities
 ├── tests/                # 30 tests, 69% coverage
 │   ├── unit/            # 26 unit tests
@@ -362,7 +327,6 @@ fi
 │   ├── load_env.sh           # Load environment variables
 │   ├── start_api.sh          # Start FastAPI server
 │   ├── docker_publish.sh     # Publish to DockerHub
-│   ├── view_drift_report.sh  # View drift monitoring results
 │   └── compare_outputs.py    # Compare pipeline outputs (for Docker reproducibility test)
 ├── examples/             # API testing examples
 ├── Dockerfile           # Container definition
@@ -425,7 +389,7 @@ docker run -p 9000:8000 ml-service:latest
 ✅ **API Serving**: FastAPI with Pydantic validation, OpenAPI docs
 ✅ **Reproducibility**: Fixed deps, random seeds, Docker, DVC
 ✅ **Containerization**: Docker images with semantic versioning
-✅ **Drift Monitoring**: Automated detection with alerts & recommended actions
+✅ **Model Evaluation**: Baseline and drift simulation with MLflow tracking
 
 ---
 
